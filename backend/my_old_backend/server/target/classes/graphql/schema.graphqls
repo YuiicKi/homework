@@ -1,0 +1,171 @@
+# RBAC V1 GraphQL Schema
+
+"""
+用户账户
+"""
+type User {
+  id: ID!
+  phone: String
+  username: String
+  isActive: Boolean
+  createdAt: String
+  roles: [Role!]!
+  profile: UserProfile
+}
+
+"""
+角色定义
+"""
+type Role {
+  id: ID!
+  name: String!
+  description: String
+}
+
+"""
+考生信息
+"""
+type StudentProfile {
+  fullName: String
+  idCardNumber: String
+  photoUrl: String
+}
+
+"""
+教师 / 监考信息
+"""
+type TeacherProfile {
+  fullName: String
+  staffId: String
+  schoolOrDepartment: String
+}
+
+"""
+考务人员信息
+"""
+type AdminProfile {
+  fullName: String
+  staffId: String
+  department: String
+}
+
+"""
+联合类型，根据角色返回对应 profile
+"""
+union UserProfile = StudentProfile | TeacherProfile | AdminProfile
+
+"""
+认证成功后的返回载荷
+"""
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+"""
+考生注册输入
+"""
+input StudentRegisterInput {
+  phone: String!
+  password: String!
+  fullName: String!
+  idCardNumber: String
+  photoUrl: String
+}
+
+"""
+管理员创建用户输入
+"""
+input AdminCreateUserInput {
+  phone: String
+  username: String
+  password: String!
+  roleName: String!
+  fullName: String!
+  staffId: String
+  schoolOrDepartment: String
+  department: String
+}
+
+"""
+管理员更新用户输入
+"""
+input UpdateUserInput {
+  phone: String
+  username: String
+  isActive: Boolean
+}
+
+type Query {
+  """
+  获取当前登录的用户信息
+  """
+  me: User
+
+  """
+  (Admin) 获取所有用户列表，可按角色筛选
+  """
+  users(role: String): [User!]!
+
+  """
+  (Admin) 获取单个用户信息
+  """
+  user(id: ID!): User
+
+  """
+  (Admin) 获取所有角色
+  """
+  roles: [Role!]!
+}
+
+type Mutation {
+  """
+  (Public) 考生注册
+  """
+  registerStudent(input: StudentRegisterInput!): AuthPayload!
+
+  """
+  (Public) 用户登录 (手机号或用户名)
+  """
+  login(loginIdentifier: String!, password: String!): AuthPayload!
+
+  """
+  (Admin) 管理员添加用户 (考务 / 教师)
+  """
+  adminCreateUser(input: AdminCreateUserInput!): User!
+
+  """
+  (Admin) 更新用户信息
+  """
+  updateUser(id: ID!, input: UpdateUserInput!): User!
+
+  """
+  (Admin) 删除用户
+  """
+  deleteUser(id: ID!): Boolean!
+
+  """
+  (Admin) 创建新角色
+  """
+  createRole(name: String!, description: String): Role!
+
+  """
+  (Admin) 更新角色
+  """
+  updateRole(id: ID!, name: String, description: String): Role!
+
+  """
+  (Admin) 删除角色
+  """
+  deleteRole(id: ID!): Boolean!
+
+  """
+  (Admin) 为用户分配角色
+  """
+  assignRoleToUser(userId: ID!, roleId: ID!): User!
+
+  """
+  (Admin) 移除用户角色
+  """
+  removeRoleFromUser(userId: ID!, roleId: ID!): User!
+}
