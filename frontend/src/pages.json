@@ -1,0 +1,38 @@
+{
+  "pages": [
+    {
+      "id": "dashboard",
+      "name": "首页",
+      "component": "Dashboard.vue",
+      "path": "/"
+    },
+    {
+      "id": "usermanagement",
+      "name": "用户管理",
+      "component": "UserManagement.vue",
+      "path": "/users",
+      "meta": {
+        "roles": ["admin"]
+      }
+    },
+    {
+      "id": "application",
+      "name": "考试报名管理",
+      "component": "ApplicationManagement.vue",
+      "path": "/application"
+    },
+    {
+      "id": "scheduling",
+      "name": "考试安排管理",
+      "component": "SchedulingManagement.vue",
+      "path": "/scheduling"
+    },
+    {
+      "id": "grades",
+      "name": "成绩管理",
+      "component": "GradeManagement.vue",
+      "path": "/grades"
+    }
+  ]
+}
+
