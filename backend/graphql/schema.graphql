@@ -6,9 +6,9 @@
 type User {
   id: ID!
   phone: String
-  username: String
   isActive: Boolean
   createdAt: String
+  fullName: String
   roles: [Role!]!
   profile: UserProfile
 }
@@ -77,8 +77,7 @@ input StudentRegisterInput {
 管理员创建用户输入
 """
 input AdminCreateUserInput {
-  phone: String
-  username: String
+  phone: String!
   password: String!
   roleName: String!
   fullName: String!
@@ -92,7 +91,6 @@ input AdminCreateUserInput {
 """
 input UpdateUserInput {
   phone: String
-  username: String
   isActive: Boolean
 }
 
@@ -127,7 +125,7 @@ type Mutation {
   """
   (Public) 用户登录 (手机号或用户名)
   """
-  login(loginIdentifier: String!, password: String!): AuthPayload!
+  login(phone: String!, password: String!): AuthPayload!
 
   """
   (Admin) 管理员添加用户 (考务 / 教师)

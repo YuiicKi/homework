@@ -14,7 +14,9 @@ com/ruangong/RuangongApplication.class
 com/ruangong/service/JwtService.class
 com/ruangong/service/UserService.class
 com/ruangong/model/StudentProfileModel.class
+com/ruangong/entity/PermissionEntity.class
 com/ruangong/entity/RoleEntity.class
+com/ruangong/service/AuthorizationService.class
 com/ruangong/repository/AdminProfileRepository.class
 com/ruangong/config/JwtGraphQlInterceptor.class
 com/ruangong/model/input/AdminCreateUserInput.class
@@ -26,3 +28,4 @@ com/ruangong/config/AppConfig.class
 com/ruangong/model/AuthPayload.class
 com/ruangong/model/AdminProfileModel.class
 com/ruangong/repository/RoleRepository.class
+com/ruangong/repository/PermissionRepository.class

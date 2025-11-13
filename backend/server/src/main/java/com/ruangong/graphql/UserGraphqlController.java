@@ -7,25 +7,31 @@ import com.ruangong.model.UserModel;
 import com.ruangong.model.input.AdminCreateUserInput;
 import com.ruangong.model.input.StudentRegisterInput;
 import com.ruangong.model.input.UpdateUserInput;
+import com.ruangong.service.AuthorizationService;
 import com.ruangong.service.UserService;
 import graphql.schema.DataFetchingEnvironment;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.util.CollectionUtils;
 
 @Controller
 @Validated
 public class UserGraphqlController {
 
-    private final UserService userService;
+    private static final Logger log = LoggerFactory.getLogger(UserGraphqlController.class);
 
-    public UserGraphqlController(UserService userService) {
+    private final UserService userService;
+    private final AuthorizationService authorizationService;
+
+    public UserGraphqlController(UserService userService, AuthorizationService authorizationService) {
         this.userService = userService;
+        this.authorizationService = authorizationService;
     }
 
     @MutationMapping
@@ -34,9 +40,9 @@ public class UserGraphqlController {
     }
 
     @MutationMapping
-    public AuthPayload login(@Argument("loginIdentifier") String loginIdentifier,
+    public AuthPayload login(@Argument("phone") String phone,
                              @Argument("password") String password) {
-        return userService.login(loginIdentifier, password);
+        return userService.login(phone, password);
     }
 
     @MutationMapping
@@ -45,7 +51,8 @@ public class UserGraphqlController {
         DataFetchingEnvironment env
     ) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "user.create");
+        logAdminAction(user, "user.create", "phone=" + input.getPhone());
         return userService.adminCreateUser(input);
     }
 
@@ -56,14 +63,16 @@ public class UserGraphqlController {
         DataFetchingEnvironment env
     ) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "user.update");
+        logAdminAction(user, "user.update", "targetId=" + id);
         return userService.updateUser(id, input);
     }
 
     @MutationMapping
     public Boolean deleteUser(@Argument("id") Long id, DataFetchingEnvironment env) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "user.delete");
+        logAdminAction(user, "user.delete", "targetId=" + id);
         return userService.deleteUser(id);
     }
 
@@ -74,7 +83,8 @@ public class UserGraphqlController {
         DataFetchingEnvironment env
     ) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "role.create");
+        logAdminAction(user, "role.create", "name=" + name);
         return userService.createRole(name, description);
     }
 
@@ -86,14 +96,16 @@ public class UserGraphqlController {
         DataFetchingEnvironment env
     ) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "role.update");
+        logAdminAction(user, "role.update", "targetId=" + id);
         return userService.updateRole(id, name, description);
     }
 
     @MutationMapping
     public Boolean deleteRole(@Argument("id") Long id, DataFetchingEnvironment env) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "role.delete");
+        logAdminAction(user, "role.delete", "targetId=" + id);
         return userService.deleteRole(id);
     }
 
@@ -104,7 +116,8 @@ public class UserGraphqlController {
         DataFetchingEnvironment env
     ) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "role.assign");
+        logAdminAction(user, "role.assign", "userId=" + userId + ", roleId=" + roleId);
         return userService.assignRoleToUser(userId, roleId);
     }
 
@@ -115,7 +128,8 @@ public class UserGraphqlController {
         DataFetchingEnvironment env
     ) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "role.assign");
+        logAdminAction(user, "role.remove", "userId=" + userId + ", roleId=" + roleId);
         return userService.removeRoleFromUser(userId, roleId);
     }
 
@@ -128,21 +142,22 @@ public class UserGraphqlController {
     @QueryMapping
     public List<UserModel> users(@Argument("role") String role, DataFetchingEnvironment env) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "user.read.all");
+        logAdminAction(user, "user.read.all", role != null ? "role=" + role : "role=ALL");
         return userService.listUsers(role);
     }
 
     @QueryMapping
     public UserModel user(@Argument("id") Long id, DataFetchingEnvironment env) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "user.read");
         return userService.getUser(id);
     }
 
     @QueryMapping
     public List<RoleModel> roles(DataFetchingEnvironment env) {
         JwtPayload user = requireCurrentUser(env);
-        ensureHasRole(user, "admin");
+        authorizationService.ensureHasPermission(user, "role.read");
         return userService.listRoles();
     }
 
@@ -154,9 +169,17 @@ public class UserGraphqlController {
         return payload;
     }
 
-    private void ensureHasRole(JwtPayload payload, String role) {
-        if (CollectionUtils.isEmpty(payload.roles()) || payload.roles().stream().noneMatch(r -> r.equalsIgnoreCase(role))) {
-            throw new IllegalStateException("无权访问");
+    private void logAdminAction(JwtPayload actor, String action, String detail) {
+        if (actor == null) {
+            return;
         }
+        log.info(
+            "Audit action={} actorId={} roles={} tokenVersion={} detail={}",
+            action,
+            actor.userId(),
+            actor.roles(),
+            actor.tokenVersion(),
+            detail
+        );
     }
 }
