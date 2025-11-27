@@ -80,7 +80,43 @@ INSERT INTO permissions (code, description) VALUES
     ('role.update', '更新角色'),
     ('role.delete', '删除角色'),
     ('role.assign', '分配或移除角色'),
-    ('role.read', '查看角色列表')
+    ('role.read', '查看角色列表'),
+    ('center.create', '创建考点'),
+    ('center.update', '更新考点'),
+    ('center.read', '查看考点'),
+    ('room.create', '创建考场'),
+    ('room.update', '更新考场'),
+    ('room.read', '查看考场'),
+    ('room.status.update', '更新考场状态'),
+    ('subject.create', '创建科目'),
+    ('subject.update', '更新科目'),
+    ('subject.read', '查看科目'),
+    ('subject.status.update', '更新科目状态'),
+    ('subject.delete', '删除科目'),
+    ('subject.import', '导入科目'),
+    ('subject.export', '导出科目'),
+    ('registration.create', '创建或更新报名时间'),
+    ('registration.status.update', '更新报名时间状态'),
+    ('registration.delete', '删除报名时间'),
+    ('registration.read', '查看报名时间'),
+    ('registration.export', '导出报名时间'),
+    ('notification.create', '创建通知'),
+    ('notification.update', '更新通知'),
+    ('notification.publish', '发布通知'),
+    ('notification.withdraw', '撤回通知'),
+    ('notification.read', '查看通知'),
+    ('notification.template', '通知模板管理'),
+    ('notification.log', '查看通知日志'),
+    ('registration.material.template', '报名材料模板管理'),
+    ('registration.audit', '报名审核'),
+    ('session.create', '创建场次'),
+    ('session.update', '更新场次'),
+    ('session.read', '查看场次'),
+    ('schedule.create', '创建排考'),
+    ('schedule.update', '更新排考'),
+    ('schedule.status.update', '更新排考状态'),
+    ('schedule.delete', '删除排考'),
+    ('schedule.read', '查看排考')
 ON CONFLICT (code) DO NOTHING;
 
 -- 默认授予管理员全部权限
@@ -97,7 +133,232 @@ JOIN permissions p ON p.code IN (
     'role.update',
     'role.delete',
     'role.assign',
-    'role.read'
+    'role.read',
+    'center.create',
+    'center.update',
+    'center.read',
+    'room.create',
+    'room.update',
+    'room.read',
+    'room.status.update',
+    'subject.create',
+    'subject.update',
+    'subject.read',
+    'subject.status.update',
+    'subject.delete',
+    'subject.import',
+    'subject.export',
+    'registration.create',
+    'registration.status.update',
+    'registration.delete',
+    'registration.read',
+    'registration.export',
+    'notification.create',
+    'notification.update',
+    'notification.publish',
+    'notification.withdraw',
+    'notification.read',
+    'notification.template',
+    'notification.log',
+    'registration.material.template',
+    'registration.audit',
+    'session.create',
+    'session.update',
+    'session.read',
+    'schedule.create',
+    'schedule.update',
+    'schedule.status.update',
+    'schedule.delete',
+    'schedule.read'
 )
 WHERE r.name = 'admin'
 ON CONFLICT DO NOTHING;
+
+-- 考点
+CREATE TABLE IF NOT EXISTS exam_centers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    address VARCHAR(255),
+    description TEXT
+);
+
+-- 考场
+CREATE TABLE IF NOT EXISTS exam_rooms (
+    id SERIAL PRIMARY KEY,
+    center_id INTEGER NOT NULL REFERENCES exam_centers(id) ON DELETE CASCADE,
+    room_number VARCHAR(50) NOT NULL,
+    name VARCHAR(100),
+    status VARCHAR(50) NOT NULL DEFAULT 'AVAILABLE',
+    capacity INTEGER,
+    location TEXT,
+    manager_name VARCHAR(100),
+    manager_phone VARCHAR(50),
+    UNIQUE (center_id, room_number)
+);
+
+-- 考场状态日志
+CREATE TABLE IF NOT EXISTS exam_room_status_logs (
+    id SERIAL PRIMARY KEY,
+    room_id INTEGER NOT NULL REFERENCES exam_rooms(id) ON DELETE CASCADE,
+    from_status VARCHAR(50),
+    to_status VARCHAR(50) NOT NULL,
+    reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 科目
+CREATE TABLE IF NOT EXISTS exam_subjects (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLED',
+    duration_minutes INTEGER NOT NULL DEFAULT 0,
+    question_count INTEGER NOT NULL DEFAULT 0,
+    description TEXT
+);
+
+-- 科目日志
+CREATE TABLE IF NOT EXISTS exam_subject_logs (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER NOT NULL REFERENCES exam_subjects(id) ON DELETE CASCADE,
+    from_status VARCHAR(50),
+    to_status VARCHAR(50),
+    reason TEXT,
+    operator_id INTEGER,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 场次
+CREATE TABLE IF NOT EXISTS exam_sessions (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    note TEXT
+);
+
+-- 排考关联
+CREATE TABLE IF NOT EXISTS exam_schedules (
+    id SERIAL PRIMARY KEY,
+    room_id INTEGER NOT NULL REFERENCES exam_rooms(id) ON DELETE CASCADE,
+    subject_id INTEGER NOT NULL REFERENCES exam_subjects(id) ON DELETE CASCADE,
+    session_id INTEGER NOT NULL REFERENCES exam_sessions(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    note TEXT,
+    UNIQUE (room_id, session_id)
+);
+
+-- 报名时间配置
+CREATE TABLE IF NOT EXISTS exam_registration_windows (
+    id SERIAL PRIMARY KEY,
+    subject_id INTEGER NOT NULL REFERENCES exam_subjects(id) ON DELETE CASCADE,
+    session_id INTEGER NOT NULL REFERENCES exam_sessions(id) ON DELETE CASCADE,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLED',
+    note TEXT
+);
+
+-- 报名时间状态日志
+CREATE TABLE IF NOT EXISTS exam_registration_window_logs (
+    id SERIAL PRIMARY KEY,
+    registration_window_id INTEGER NOT NULL REFERENCES exam_registration_windows(id) ON DELETE CASCADE,
+    from_status VARCHAR(50),
+    to_status VARCHAR(50),
+    reason TEXT,
+    operator_id INTEGER,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 通知主表
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    content TEXT,
+    channel VARCHAR(100) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+    scheduled_at TIMESTAMPTZ,
+    created_by INTEGER,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ
+);
+
+-- 通知模板
+CREATE TABLE IF NOT EXISTS notification_templates (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    variables TEXT
+);
+
+-- 通知目标范围
+CREATE TABLE IF NOT EXISTS notification_targets (
+    id SERIAL PRIMARY KEY,
+    notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    target_type VARCHAR(100) NOT NULL,
+    target_value VARCHAR(200)
+);
+
+-- 通知发送日志
+CREATE TABLE IF NOT EXISTS notification_logs (
+    id SERIAL PRIMARY KEY,
+    notification_id INTEGER NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+    channel VARCHAR(100) NOT NULL,
+    target VARCHAR(200) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    error TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 报名信息
+CREATE TABLE IF NOT EXISTS registration_info (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subject_id INTEGER NOT NULL REFERENCES exam_subjects(id) ON DELETE CASCADE,
+    full_name VARCHAR(100) NOT NULL,
+    id_card_number VARCHAR(30) NOT NULL,
+    gender VARCHAR(10),
+    birth_date DATE,
+    phone VARCHAR(50),
+    email VARCHAR(100),
+    status VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_registration_user_subject ON registration_info(user_id, subject_id);
+
+-- 报名材料
+CREATE TABLE IF NOT EXISTS registration_materials (
+    id SERIAL PRIMARY KEY,
+    registration_info_id INTEGER NOT NULL REFERENCES registration_info(id) ON DELETE CASCADE,
+    type VARCHAR(100) NOT NULL,
+    file_url TEXT NOT NULL,
+    file_format VARCHAR(50),
+    file_size BIGINT,
+    status VARCHAR(50),
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ
+);
+
+-- 报名审核日志
+CREATE TABLE IF NOT EXISTS registration_audit_logs (
+    id SERIAL PRIMARY KEY,
+    registration_info_id INTEGER NOT NULL REFERENCES registration_info(id) ON DELETE CASCADE,
+    result VARCHAR(50) NOT NULL,
+    reason TEXT,
+    operator_id INTEGER,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 报名材料模板/要求
+CREATE TABLE IF NOT EXISTS registration_material_templates (
+    id SERIAL PRIMARY KEY,
+    type VARCHAR(100) NOT NULL,
+    allowed_formats TEXT,
+    max_size BIGINT,
+    required BOOLEAN DEFAULT FALSE,
+    description TEXT
+);
