@@ -8,7 +8,7 @@
 
 1. **分层清晰**：遵循 `GraphQL Controller → Service → Repository → Entity` 的结构，保持业务逻辑集中在 Service 层。
 2. **统一 Schema**：所有接口通过 GraphQL 暴露；REST 仅用于内部调试时的健康检查，不再新增。
-3. **显式鉴权**：新增 Mutation/Query 若涉及权限，务必使用 `ensureAuthenticated`、`ensureHasRole` 等现有工具。
+3. **显式鉴权**：新增 Mutation/Query 若涉及权限，务必使用 `AuthorizationService.ensureHasPermission` 或同类工具进行校验；若存在角色等级限制（如教师不可操作管理员），需额外结合 `AuthorizationService.hasRole` 或业务逻辑判断目标对象的角色。
 4. **自动化优先**：每个业务功能需同步补充 JUnit/集成测试，保证 `mvn test` 通过。
 5. **文档同步**：更新 `docs/handout.md` / `docs/graphiql_cheatsheet.md` 中的接口说明与流程示例。
 
@@ -52,7 +52,7 @@ server/src/main/java/com/ruangong/
 
 3. **Resolver 实现**
    - 在 `graphql/UserGraphqlController` 中添加方法，使用 `@QueryMapping` / `@MutationMapping`。
-   - 注入 Service 调用；需要鉴权时调用 `requireCurrentUser`、`ensureHasRole` 等。
+   - 注入 Service 调用；需要鉴权时调用 `requireCurrentUser`、`authorizationService.ensureHasPermission` 等。
 
 4. **Service 与数据层**
    - 在 Service 中编写业务逻辑，使用 `@Transactional` 控制事务。

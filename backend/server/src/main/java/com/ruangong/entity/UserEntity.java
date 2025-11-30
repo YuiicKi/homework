@@ -22,11 +22,8 @@ public class UserEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true)
+    @Column(unique = true, nullable = false)
     private String phone;
-
-    @Column(unique = true)
-    private String username;
 
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
@@ -36,6 +33,9 @@ public class UserEntity {
 
     @Column(name = "created_at", nullable = false, columnDefinition = "TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP")
     private OffsetDateTime createdAt;
+
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
@@ -61,14 +61,6 @@ public class UserEntity {
         this.phone = phone;
     }
 
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
     public String getPasswordHash() {
         return passwordHash;
     }
@@ -91,6 +83,14 @@ public class UserEntity {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
     }
 
     public Set<RoleEntity> getRoles() {

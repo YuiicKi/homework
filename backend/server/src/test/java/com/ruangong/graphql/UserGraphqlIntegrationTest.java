@@ -135,9 +135,9 @@ class UserGraphqlIntegrationTest {
         Assertions.assertTrue(registerNode.path("registerStudent").path("token").isTextual());
 
         JsonNode loginNode = executeGraphQl(
-            "mutation Login($id:String!, $pwd:String!){"
-                + " login(loginIdentifier:$id, password:$pwd){ token user { roles { name } } } }",
-            Map.of("id", "13900001111", "pwd", "Student@123"),
+            "mutation Login($phone:String!, $pwd:String!){"
+                + " login(phone:$phone, password:$pwd){ token user { roles { name } } } }",
+            Map.of("phone", "13900001111", "pwd", "Student@123"),
             null
         );
 
@@ -152,7 +152,6 @@ class UserGraphqlIntegrationTest {
 
         Map<String, Object> input = new HashMap<>();
         input.put("phone", "13988887777");
-        input.put("username", "teacher_wei");
         input.put("password", "Teacher@123");
         input.put("roleName", "teacher");
         input.put("fullName", "魏老师");
@@ -163,7 +162,7 @@ class UserGraphqlIntegrationTest {
         JsonNode response = executeGraphQl(
             "mutation Create($input: AdminCreateUserInput!){"
                 + " adminCreateUser(input:$input){"
-                + " id phone username roles { name } profile { ... on TeacherProfile { fullName staffId schoolOrDepartment } }"
+                + " id phone fullName roles { name } profile { ... on TeacherProfile { fullName staffId schoolOrDepartment } }"
                 + " } }",
             Map.of("input", input),
             adminToken
@@ -173,19 +172,67 @@ class UserGraphqlIntegrationTest {
         Assertions.assertTrue(created.path("id").isTextual());
         Assertions.assertEquals("teacher", created.path("roles").get(0).path("name").asText());
         Assertions.assertEquals("魏老师", created.path("profile").path("fullName").asText());
+        Assertions.assertEquals("魏老师", created.path("fullName").asText());
+    }
+
+    @Test
+    void teacherCannotCreateAdminUser() {
+        String adminToken = loginAndGetToken(ADMIN_PHONE, ADMIN_PASSWORD);
+
+        Map<String, Object> teacherInput = new HashMap<>();
+        teacherInput.put("phone", "13988887779");
+        teacherInput.put("password", "Teacher@123");
+        teacherInput.put("roleName", "teacher");
+        teacherInput.put("fullName", "李老师");
+        teacherInput.put("staffId", "T3001");
+        teacherInput.put("schoolOrDepartment", "物理系");
+        teacherInput.put("department", null);
+
+        executeGraphQl(
+            "mutation Create($input: AdminCreateUserInput!){"
+                + " adminCreateUser(input:$input){ id } }",
+            Map.of("input", teacherInput),
+            adminToken
+        );
+
+        String teacherToken = loginAndGetToken("13988887779", "Teacher@123");
+
+        Map<String, Object> adminInput = new HashMap<>();
+        adminInput.put("phone", "13977776666");
+        adminInput.put("password", "Admin@123");
+        adminInput.put("roleName", "admin");
+        adminInput.put("fullName", "测试管理员");
+        adminInput.put("staffId", "ADM002");
+        adminInput.put("schoolOrDepartment", null);
+        adminInput.put("department", "测试部");
+
+        JsonNode root = executeGraphQlRoot(
+            "mutation Create($input: AdminCreateUserInput!){"
+                + " adminCreateUser(input:$input){ id } }",
+            Map.of("input", adminInput),
+            teacherToken
+        );
+
+        Assertions.assertTrue(root.has("errors"));
+        Assertions.assertEquals("无权访问",
+            root.path("errors").get(0).path("message").asText());
     }
 
     private String loginAndGetToken(String identifier, String password) {
         JsonNode node = executeGraphQl(
-            "mutation Login($id:String!, $pwd:String!){"
-                + " login(loginIdentifier:$id, password:$pwd){ token } }",
-            Map.of("id", identifier, "pwd", password),
+            "mutation Login($phone:String!, $pwd:String!){"
+                + " login(phone:$phone, password:$pwd){ token } }",
+            Map.of("phone", identifier, "pwd", password),
             null
         );
         return node.path("login").path("token").asText();
     }
 
     private JsonNode executeGraphQl(String document, Map<String, Object> variables, String token) {
+        return executeGraphQlRoot(document, variables, token).path("data");
+    }
+
+    private JsonNode executeGraphQlRoot(String document, Map<String, Object> variables, String token) {
         Map<String, Object> payload = new HashMap<>();
         payload.put("query", document);
         payload.put("variables", variables);
@@ -206,7 +253,7 @@ class UserGraphqlIntegrationTest {
             .getResponseBody();
 
         try {
-            return objectMapper.readTree(body).path("data");
+            return objectMapper.readTree(body);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse GraphQL response", e);
         }

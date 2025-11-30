@@ -25,8 +25,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -86,14 +84,18 @@ public class UserService {
         user.getRoles().add(studentRole);
         user = userRepository.save(user);
 
-        UserModel userModel = mapUser(refreshUser(user.getId()));
-        String token = jwtService.generateToken(userModel.id(), extractRoleNames(userModel));
+        UserEntity refreshedUser = refreshUser(user.getId());
+        UserModel userModel = mapUser(refreshedUser);
+        String token = jwtService.generateToken(
+            userModel.id(),
+            extractRoleNames(userModel),
+            safeTokenVersion(refreshedUser)
+        );
         return new AuthPayload(token, userModel);
     }
 
-    public AuthPayload login(String loginIdentifier, String password) {
-        Optional<UserEntity> byPhone = userRepository.findByPhone(loginIdentifier);
-        UserEntity user = byPhone.or(() -> userRepository.findByUsername(loginIdentifier))
+    public AuthPayload login(String phone, String password) {
+        UserEntity user = userRepository.findByPhone(phone)
             .orElseThrow(() -> new IllegalArgumentException("账号或密码错误"));
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -104,28 +106,26 @@ public class UserService {
             throw new IllegalArgumentException("账号或密码错误");
         }
 
-        UserModel userModel = mapUser(refreshUser(user.getId()));
-        String token = jwtService.generateToken(userModel.id(), extractRoleNames(userModel));
+        UserEntity refreshedUser = refreshUser(user.getId());
+        UserModel userModel = mapUser(refreshedUser);
+        String token = jwtService.generateToken(
+            userModel.id(),
+            extractRoleNames(userModel),
+            safeTokenVersion(refreshedUser)
+        );
         return new AuthPayload(token, userModel);
     }
 
     public UserModel adminCreateUser(AdminCreateUserInput input) {
-        if (!StringUtils.hasText(input.getPhone()) && !StringUtils.hasText(input.getUsername())) {
-            throw new IllegalArgumentException("必须提供手机号或用户名");
-        }
-        if (StringUtils.hasText(input.getPhone()) && userRepository.existsByPhone(input.getPhone())) {
+        if (userRepository.existsByPhone(input.getPhone())) {
             throw new IllegalArgumentException("手机号已被占用");
-        }
-        if (StringUtils.hasText(input.getUsername()) && userRepository.existsByUsername(input.getUsername())) {
-            throw new IllegalArgumentException("用户名已被占用");
         }
 
         RoleEntity role = roleRepository.findByName(input.getRoleName())
             .orElseThrow(() -> new IllegalArgumentException("角色不存在"));
 
         UserEntity user = new UserEntity();
-        user.setPhone(normalizeBlank(input.getPhone()));
-        user.setUsername(normalizeBlank(input.getUsername()));
+        user.setPhone(input.getPhone());
         user.setPasswordHash(passwordEncoder.encode(input.getPassword()));
         user.setIsActive(Boolean.TRUE);
         user = userRepository.save(user);
@@ -146,24 +146,20 @@ public class UserService {
     public UserModel updateUser(Long id, UpdateUserInput input) {
         UserEntity user = refreshUser(id);
 
-        String nextPhone = input.getPhone() != null ? normalizeBlank(input.getPhone()) : user.getPhone();
-        String nextUsername = input.getUsername() != null ? normalizeBlank(input.getUsername()) : user.getUsername();
-
-        if (!StringUtils.hasText(nextPhone) && !StringUtils.hasText(nextUsername)) {
-            throw new IllegalArgumentException("手机号和用户名不能同时为空");
-        }
-
-        if (input.getPhone() != null && !equalsNullable(user.getPhone(), nextPhone)
-            && StringUtils.hasText(nextPhone) && userRepository.existsByPhone(nextPhone)) {
-            throw new IllegalArgumentException("手机号已被占用");
-        }
-        if (input.getUsername() != null && !equalsNullable(user.getUsername(), nextUsername)
-            && StringUtils.hasText(nextUsername) && userRepository.existsByUsername(nextUsername)) {
-            throw new IllegalArgumentException("用户名已被占用");
+        String nextPhone;
+        if (input.getPhone() != null) {
+            nextPhone = normalizeBlank(input.getPhone());
+            if (!StringUtils.hasText(nextPhone)) {
+                throw new IllegalArgumentException("手机号不能为空");
+            }
+            if (!nextPhone.equals(user.getPhone()) && userRepository.existsByPhone(nextPhone)) {
+                throw new IllegalArgumentException("手机号已被占用");
+            }
+        } else {
+            nextPhone = user.getPhone();
         }
 
         user.setPhone(nextPhone);
-        user.setUsername(nextUsername);
         if (input.getIsActive() != null) {
             user.setIsActive(input.getIsActive());
         }
@@ -279,6 +275,17 @@ public class UserService {
             .toList();
     }
 
+    public void revokeTokensForUser(Long userId) {
+        int updated = userRepository.incrementTokenVersionForUser(userId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+    }
+
+    public void revokeAllTokens() {
+        userRepository.incrementTokenVersionForAllUsers();
+    }
+
     private UserEntity refreshUser(Long id) {
         return userRepository.findById(id)
             .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
@@ -325,12 +332,14 @@ public class UserService {
         OffsetDateTime createdAt = user.getCreatedAt();
         String createdAtIso = createdAt != null ? createdAt.toString() : null;
 
+        String fullName = extractFullName(profile);
+
         return new UserModel(
             user.getId(),
             user.getPhone(),
-            user.getUsername(),
             user.getIsActive(),
             createdAtIso,
+            fullName,
             roles,
             profile
         );
@@ -373,17 +382,26 @@ public class UserService {
         return userModel.roles().stream().map(RoleModel::name).collect(Collectors.toCollection(ArrayList::new));
     }
 
+    private long safeTokenVersion(UserEntity user) {
+        Integer version = user.getTokenVersion();
+        return version != null ? version.longValue() : 0L;
+    }
+
+    private String extractFullName(UserProfileModel profile) {
+        if (profile instanceof AdminProfileModel adminProfile) {
+            return adminProfile.fullName();
+        }
+        if (profile instanceof TeacherProfileModel teacherProfile) {
+            return teacherProfile.fullName();
+        }
+        if (profile instanceof StudentProfileModel studentProfile) {
+            return studentProfile.fullName();
+        }
+        return null;
+    }
+
     private static String normalizeBlank(String value) {
         return StringUtils.hasText(value) ? value : null;
     }
 
-    private static boolean equalsNullable(String a, String b) {
-        if (a == null && b == null) {
-            return true;
-        }
-        if (a == null || b == null) {
-            return false;
-        }
-        return a.equals(b);
-    }
 }

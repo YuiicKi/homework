@@ -2,6 +2,7 @@ package com.ruangong.service;
 
 import com.ruangong.config.JwtProperties;
 import com.ruangong.model.JwtPayload;
+import com.ruangong.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -19,10 +20,12 @@ import org.springframework.stereotype.Service;
 public class JwtService {
 
     private final JwtProperties properties;
+    private final UserRepository userRepository;
     private Key signingKey;
 
-    public JwtService(JwtProperties properties) {
+    public JwtService(JwtProperties properties, UserRepository userRepository) {
         this.properties = properties;
+        this.userRepository = userRepository;
     }
 
     @PostConstruct
@@ -43,7 +46,7 @@ public class JwtService {
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(Long userId, List<String> roles) {
+    public String generateToken(Long userId, List<String> roles, long tokenVersion) {
         Instant now = Instant.now();
         Instant expiresAt = now.plusSeconds(properties.getExpiresInSeconds());
         return Jwts.builder()
@@ -51,6 +54,7 @@ public class JwtService {
             .setIssuedAt(Date.from(now))
             .setExpiration(Date.from(expiresAt))
             .claim("roles", roles)
+            .claim("ver", tokenVersion)
             .signWith(signingKey, SignatureAlgorithm.HS256)
             .compact();
     }
@@ -65,6 +69,20 @@ public class JwtService {
         Long userId = Long.parseLong(claims.getSubject());
         @SuppressWarnings("unchecked")
         List<String> roles = claims.get("roles", List.class);
-        return new JwtPayload(userId, roles);
+        Number version = claims.get("ver", Number.class);
+        if (version == null) {
+            throw new IllegalStateException("Token 缺少版本信息");
+        }
+
+        long tokenVersion = version.longValue();
+        return userRepository.findById(userId)
+            .map(user -> {
+                long currentVersion = user.getTokenVersion() != null ? user.getTokenVersion() : 0L;
+                if (currentVersion != tokenVersion) {
+                    throw new IllegalStateException("Token 已被撤销");
+                }
+                return new JwtPayload(userId, roles, tokenVersion);
+            })
+            .orElseThrow(() -> new IllegalStateException("用户不存在"));
     }
 }

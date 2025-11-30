@@ -9,7 +9,6 @@ public class UpdateUserInput {
         message = "手机号格式不正确"
     )
     private String phone;
-    private String username;
     private Boolean isActive;
 
     public String getPhone() {
@@ -18,14 +17,6 @@ public class UpdateUserInput {
 
     public void setPhone(String phone) {
         this.phone = phone;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
     }
 
     public Boolean getIsActive() {

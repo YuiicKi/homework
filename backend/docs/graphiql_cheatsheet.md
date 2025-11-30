@@ -5,12 +5,13 @@
 
 ## 1. 管理员登录获取 Token
 ```graphql
-mutation AdminLogin($id:String!, $pwd:String!){
-  login(loginIdentifier:$id, password:$pwd){
+mutation AdminLogin($phone:String!, $pwd:String!){
+  login(phone:$phone, password:$pwd){
     token
     user {
       id
       phone
+      fullName
       roles { name }
     }
   }
@@ -19,7 +20,7 @@ mutation AdminLogin($id:String!, $pwd:String!){
 Variables
 ```json
 {
-  "id": "13876543210",
+  "phone": "13876543210",
   "pwd": "Admin@2024"
 }
 ```
@@ -30,7 +31,7 @@ query CurrentUser {
   me {
     id
     phone
-    username
+    fullName
     roles { name }
     profile {
       ... on AdminProfile { fullName department }
@@ -47,7 +48,7 @@ mutation CreateTeacher($input: AdminCreateUserInput!){
   adminCreateUser(input: $input){
     id
     phone
-    username
+    fullName
     roles { name }
     profile {
       ... on TeacherProfile {
@@ -64,7 +65,6 @@ Variables
 {
   "input": {
     "phone": "13987654321",
-    "username": "teacher_wei",
     "password": "Teacher@123",
     "roleName": "teacher",
     "fullName": "魏老师",
@@ -73,6 +73,7 @@ Variables
   }
 }
 ```
+> 说明：仅管理员拥有 `user.create` 权限，其它角色调用该接口会提示“无权访问”。
 
 ## 4. 查询教师列表
 ```graphql
@@ -80,7 +81,7 @@ query Teachers {
   users(role: "teacher") {
     id
     phone
-    username
+    fullName
     roles { name }
     profile {
       ... on TeacherProfile { fullName staffId schoolOrDepartment }
