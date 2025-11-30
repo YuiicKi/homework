@@ -76,18 +76,25 @@ const pages = ref(pagesConfig.pages)
 const router = useRouter()
 const userStore = useUserStore()
 
-// 3. 【新增】计算属性：根据角色过滤菜单
+// src/components/sidebar/Sidebar.vue (script setup 部分)
+
+// 3. 【已修正】计算属性：根据角色过滤菜单
 const visiblePages = computed(() => {
+  // 如果是管理员，直接拥有上帝视角，看到所有菜单
+  // (注意：这里要确保您 user.ts 里存的角色值确实是 'ADMIN')
+  if (userStore.role === 'ADMIN') {
+    return pages.value
+  }
+
+  // 如果不是管理员，则按规则过滤
   return pages.value.filter(page => {
-    // 检查 page.meta 和 page.meta.roles 是否存在
+    // 1. 如果页面没有 meta 配置，或者 meta.roles 为空，说明是公开页面
     if (!page.meta || !page.meta.roles) {
-      // 如果页面没有 meta.roles (权限) 要求，则所有人可见
-      // (我们假设 'user' 是基础角色，'admin' 是管理员)
-      return true 
+      return true
     }
     
-    // 如果有权限要求，检查当前用户的角色是否在列表中
-    // (userStore.role 必须是 'admin' 或 'user')
+    // 2. 检查普通用户的角色 (userStore.role) 是否在允许列表中
+    // 例如：meta.roles: ["STUDENT"]，而 userStore.role 是 "STUDENT"
     return page.meta.roles.includes(userStore.role)
   })
 })

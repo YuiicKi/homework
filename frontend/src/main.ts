@@ -1,54 +1,49 @@
-// src/main.ts
-
 import { createApp } from 'vue'
-import { createPinia } from 'pinia' // 1. Pinia
+import { createPinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate' // 引入持久化插件
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import './style.css' 
 
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
-// 2. Apollo
+// Apollo
 import { ApolloClients } from '@vue/apollo-composable'
 import { apolloClient } from './apollo' 
 
 import App from './App.vue'
-import router from './router' // 3. Router
+import router from './router'
 
-// 
-// ⬇️ 【 关键修改 1 】 ⬇️
-// 不再是 import './router/permission'
-// 而是导入 setupPermissionGuard 函数
+// 导入路由守卫配置函数
 import { setupPermissionGuard } from './router/permission' 
-// ⬆️ 【 关键修改 1 】 ⬆️
-//
 
 const app = createApp(App)
 
-// 全局注册 Element Plus 图标
+// --- 1. 配置 Pinia (包含持久化插件) ---
+const pinia = createPinia()
+pinia.use(piniaPluginPersistedstate) // 注册插件，解决 TS 报错并使功能生效
+app.use(pinia)
+
+// --- 2. 注册 Element Plus 图标 ---
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 
-// --- 【 关键修改 2：调整挂载顺序 】 ---
-
-// 1. 必须先挂载 Pinia
-app.use(createPinia())
-
-// 2. 挂载路由
+// --- 3. 挂载路由 ---
 app.use(router)
 
-// 3. 挂载 Element Plus
+// --- 4. 挂载 Element Plus ---
 app.use(ElementPlus) 
 
-// 4. 提供 Apollo (它必须在 Pinia 之后，以便 authLink 能工作)
+// --- 5. 提供 Apollo Client ---
+// (注意：如果你的 apollo.ts 内部依赖了 userStore，确保 Pinia 已经挂载)
 app.provide(ApolloClients, {
   default: apolloClient,
 })
 
-// 5. 【关键】最后设置路由守卫
-// (此时 Pinia 和 Router 都已准备就绪)
+// --- 6. 设置路由守卫 ---
+// (此时 Pinia 和 Router 都已准备就绪，可以安全地在守卫中调用 Store)
 setupPermissionGuard(router)
 
-// 6. 挂载 App
+// --- 7. 挂载应用 ---
 app.mount('#app')
