@@ -33,8 +33,8 @@
     <!-- 用户表格 -->
     <el-table :data="users" border style="width: 100%" v-if="!loading">
       <el-table-column prop="id" label="ID" width="180" />
-      <el-table-column prop="username" label="用户名" />
       <el-table-column prop="phone" label="手机号" />
+      <el-table-column prop="fullName" label="姓名" />
       <el-table-column label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.isActive ? 'success' : 'danger'">
@@ -60,7 +60,6 @@
           </el-tag>
         </template>
       </el-table-column>
-      
       
       <el-table-column label="操作" width="280">
         <template #default="{ row }">
@@ -115,14 +114,11 @@
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="createForm.phone" />
         </el-form-item>
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="createForm.username" />
+        <el-form-item label="姓名" prop="fullName">
+          <el-input v-model="createForm.fullName" />
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input v-model="createForm.password" type="password" />
-        </el-form-item>
-        <el-form-item label="姓名" prop="fullName">
-          <el-input v-model="createForm.fullName" />
         </el-form-item>
         <el-form-item label="工号" prop="staffId" v-if="createForm.roleName && createForm.roleName !== 'STUDENT' && createForm.roleName !== 'student'">
           <el-input v-model="createForm.staffId" />
@@ -151,8 +147,8 @@
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="editForm.phone" />
         </el-form-item>
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="editForm.username" />
+        <el-form-item label="姓名" prop="fullName">
+          <el-input v-model="editForm.fullName" />
         </el-form-item>
         <el-form-item label="状态" prop="isActive">
           <el-switch v-model="editForm.isActive" />
@@ -206,8 +202,8 @@ import { Warning } from '@element-plus/icons-vue'
 // --- 类型定义 ---
 interface User {
   id: string
-  username: string
   phone?: string
+  fullName?: string
   isActive: boolean
   createdAt: string
   roles: Role[]
@@ -223,9 +219,8 @@ interface Role {
 interface CreateFormData {
   roleName: string
   phone: string
-  username: string
-  password: string
   fullName: string
+  password: string
   staffId: string
   schoolOrDepartment: string
   department: string
@@ -234,7 +229,7 @@ interface CreateFormData {
 interface EditFormData {
   id: string
   phone: string
-  username: string
+  fullName: string
   isActive: boolean
 }
 
@@ -243,8 +238,8 @@ const GET_USERS_QUERY = gql`
   query GetUsers($role: String) {
     users(role: $role) {
       id
-      username
       phone
+      fullName
       isActive
       createdAt
       roles {
@@ -270,8 +265,8 @@ const CREATE_USER_MUTATION = gql`
   mutation AdminCreateUser($input: AdminCreateUserInput!) {
     adminCreateUser(input: $input) {
       id
-      username
       phone
+      fullName
       isActive
       roles {
         id
@@ -285,8 +280,8 @@ const UPDATE_USER_MUTATION = gql`
   mutation UpdateUser($id: ID!, $input: UpdateUserInput!) {
     updateUser(id: $id, input: $input) {
       id
-      username
       phone
+      fullName
       isActive
     }
   }
@@ -302,7 +297,8 @@ const ASSIGN_ROLE_MUTATION = gql`
   mutation AssignRoleToUser($userId: ID!, $roleId: ID!) {
     assignRoleToUser(userId: $userId, roleId: $roleId) {
       id
-      username
+      phone
+      fullName
       roles {
         id
         name
@@ -315,7 +311,8 @@ const REMOVE_ROLE_MUTATION = gql`
   mutation RemoveRoleFromUser($userId: ID!, $roleId: ID!) {
     removeRoleFromUser(userId: $userId, roleId: $roleId) {
       id
-      username
+      phone
+      fullName
       roles {
         id
         name
@@ -407,9 +404,8 @@ const editFormRef = ref<FormInstance>()
 const createForm = reactive<CreateFormData>({
   roleName: '',
   phone: '',
-  username: '',
-  password: '',
   fullName: '',
+  password: '',
   staffId: '',
   schoolOrDepartment: '',
   department: ''
@@ -419,7 +415,7 @@ const createForm = reactive<CreateFormData>({
 const editForm = reactive<EditFormData>({
   id: '',
   phone: '',
-  username: '',
+  fullName: '',
   isActive: true
 })
 
@@ -428,7 +424,7 @@ const createRules: FormRules = {
   roleName: [
     { required: true, message: '请选择角色', trigger: 'change' },
     { 
-      validator: (_, value, callback) => { // 修复：将未使用的rule参数改为下划线
+      validator: (_, value, callback) => {
         if (!value) {
           callback(new Error('角色不能为空'))
         } else {
@@ -438,13 +434,14 @@ const createRules: FormRules = {
       trigger: 'change' 
     }
   ],
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  fullName: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  fullName: [{ required: true, message: '请输入姓名', trigger: 'blur' }]
+  phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }]
 }
 
 const editRules: FormRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }]
+  fullName: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }]
 }
 
 // --- 变更操作 ---
@@ -462,7 +459,7 @@ const refreshUsers = () => {
 // 获取用户当前角色（用于编辑对话框）
 const getUserCurrentRoles = (userId: string) => {
   if (!userId) return []
-  const user = users.value.find((u: User) => u.id === userId) // 修复：为参数u添加类型注解
+  const user = users.value.find((u: User) => u.id === userId)
   return user ? user.roles : []
 }
 
@@ -485,7 +482,7 @@ const handleRemoveSpecificRole = async (user: User, roleId: string) => {
     const roleDisplayName = roleToRemove ? getRoleDisplayName(roleToRemove.name) : '未知角色'
     
     await ElMessageBox.confirm(
-      `确定要从用户 "${user.username}" 移除 "${roleDisplayName}" 角色吗？`,
+      `确定要从用户 "${user.fullName || user.phone}" 移除 "${roleDisplayName}" 角色吗？`,
       '确认移除角色',
       {
         confirmButtonText: '确定',
@@ -499,7 +496,7 @@ const handleRemoveSpecificRole = async (user: User, roleId: string) => {
       roleId: roleId
     })
     
-    ElMessage.success(`已移除用户 ${user.username} 的 ${roleDisplayName} 角色`)
+    ElMessage.success(`已移除用户 ${user.fullName || user.phone} 的 ${roleDisplayName} 角色`)
     refreshUsers()
   } catch (err) {
     if (err !== 'cancel') {
@@ -562,7 +559,7 @@ const handleAssignRole = async (user: User, roleId: string) => {
     
     const assignedRole = roles.value.find((role: Role) => role.id === roleId)
     const roleName = assignedRole ? getRoleDisplayName(assignedRole.name) : '未知角色'
-    ElMessage.success(`成功将用户 ${user.username} 分配为 ${roleName} 角色`)
+    ElMessage.success(`成功将用户 ${user.fullName || user.phone} 分配为 ${roleName} 角色`)
     refreshUsers()
   } catch (err) {
     ElMessage.error(`角色分配失败: ${getErrorMessage(err)}`)
@@ -591,9 +588,8 @@ const handleCreate = async () => {
       input: {
         roleName: createForm.roleName,
         phone: createForm.phone,
-        username: createForm.username,
-        password: createForm.password,
         fullName: createForm.fullName,
+        password: createForm.password,
         staffId: createForm.staffId || undefined,
         schoolOrDepartment: createForm.schoolOrDepartment || undefined,
         department: createForm.department || undefined
@@ -616,7 +612,7 @@ const handleEdit = (row: User) => {
   Object.assign(editForm, {
     id: row.id,
     phone: row.phone || '',
-    username: row.username || '',
+    fullName: row.fullName || '',
     isActive: row.isActive
   })
   showEditDialog.value = true
@@ -641,7 +637,7 @@ const handleUpdate = async () => {
       id: editForm.id,
       input: {
         phone: editForm.phone || undefined,
-        username: editForm.username || undefined,
+        fullName: editForm.fullName || undefined,
         isActive: editForm.isActive
       }
     })
@@ -683,7 +679,7 @@ const handleToggleStatus = async (row: User) => {
 const handleDelete = async (row: User) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除用户 "${row.username}" 吗？此操作不可恢复。`,
+      `确定要删除用户 "${row.fullName || row.phone}" 吗？此操作不可恢复。`,
       '确认删除',
       {
         confirmButtonText: '确定',

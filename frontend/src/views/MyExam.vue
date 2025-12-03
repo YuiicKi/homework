@@ -8,7 +8,6 @@
 
       <el-table :data="examList" border v-loading="loading" style="width: 100%">
         <el-table-column prop="subjectName" label="考试科目" width="180" />
-        
         <el-table-column label="考试时间" width="320">
           <template #default="{ row }">
             <div class="time-cell">
@@ -19,7 +18,6 @@
             </div>
           </template>
         </el-table-column>
-
         <el-table-column label="考场位置" min-width="250">
           <template #default="{ row }">
             <div v-if="row.roomName">
@@ -29,7 +27,6 @@
             <div v-else class="pending-text">待分配</div>
           </template>
         </el-table-column>
-
         <el-table-column label="座位号" width="100" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.seatNumber" effect="dark" type="warning">
@@ -38,9 +35,7 @@
             <span v-else class="pending-text">-</span>
           </template>
         </el-table-column>
-
         <el-table-column prop="ticketNumber" label="准考证号" width="180" font-family="monospace" />
-
         <el-table-column label="操作" width="150" align="center" fixed="right">
           <template #default="{ row }">
             <el-button 
@@ -58,38 +53,24 @@
       </el-table>
     </el-card>
 
-    <!-- 准考证预览弹窗 -->
-    <el-dialog v-model="showCardDialog" title="电子准考证" width="600px" destroy-on-close>
-      <div class="admit-card-preview" v-loading="cardLoading">
-        <div v-if="cardData" class="card-box">
-          <div class="card-header">
-            <h3>{{ cardData.subjectName }} - 准考证</h3>
-            <span class="ticket-no">NO. {{ cardData.ticketNumber }}</span>
-          </div>
-          
-          <div class="card-body">
-            <el-descriptions :column="2" border>
-              <el-descriptions-item label="考生姓名">{{ cardData.fullName }}</el-descriptions-item>
-              <el-descriptions-item label="身份证号">{{ cardData.idCardNumber }}</el-descriptions-item>
-              <el-descriptions-item label="考场信息" :span="2">
-                {{ cardData.roomName }} ({{ cardData.roomNumber }}) - 座位: <b>{{ cardData.seatNumber }}</b>
-              </el-descriptions-item>
-              <el-descriptions-item label="考试时间" :span="2">
-                {{ formatDate(cardData.sessionStartTime) }} 至 {{ formatDate(cardData.sessionEndTime) }}
-              </el-descriptions-item>
-            </el-descriptions>
-
-            <div class="exam-notice" v-if="cardData.examNotice">
-              <h4>考生须知：</h4>
-              <p>{{ cardData.examNotice }}</p>
-            </div>
-          </div>
-        </div>
-        <el-empty v-else description="暂无准考证数据" />
+    <el-dialog v-model="showCardDialog" title="电子准考证" width="850px" destroy-on-close top="5vh">
+      
+      <div v-loading="cardLoading" style="min-height: 200px; display: flex; justify-content: center;">
+        <AdmitCard 
+          v-if="cardData"
+          :student="transformedStudent"
+          :exams="transformedExams"
+          :template-data="transformedTemplate"
+          :exam-name="cardData.subjectName + ' 期末考试'"
+        />
+        <el-empty v-else-if="!cardLoading" description="暂无数据" />
       </div>
+
       <template #footer>
         <el-button @click="showCardDialog = false">关闭</el-button>
-        <el-button type="primary" @click="printCard" :disabled="!cardData">打印</el-button>
+        <el-button type="primary" @click="printCard" :disabled="!cardData">
+          <el-icon style="margin-right:5px"><Printer /></el-icon> 打印准考证
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -99,12 +80,13 @@
 import { ref, computed } from 'vue'
 import { gql } from '@apollo/client/core'
 import { useQuery, useLazyQuery } from '@vue/apollo-composable'
-import { Ticket } from '@element-plus/icons-vue'
+import { Ticket, Printer } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import dayjs from 'dayjs'
+// 关键点：引入我们之前写好的组件 (请确认路径是否正确)
+import AdmitCard from './AdmitCard.vue'
 
 // 1. 获取考试列表
-// 对应 Schema: myExamSchedules(subjectId: ID): [MyExamSchedule!]!
 const GET_MY_SCHEDULES = gql`
   query GetMyExamSchedules {
     myExamSchedules {
@@ -123,7 +105,6 @@ const GET_MY_SCHEDULES = gql`
 `
 
 // 2. 获取准考证详情
-// 对应 Schema: admitCard(registrationInfoId: ID!, templateId: ID): AdmitCard
 const GET_ADMIT_CARD = gql`
   query GetAdmitCard($regId: ID!) {
     admitCard(registrationInfoId: $regId) {
@@ -137,6 +118,7 @@ const GET_ADMIT_CARD = gql`
       sessionStartTime
       sessionEndTime
       examNotice
+      logoUrl
     }
   }
 `
@@ -150,18 +132,56 @@ const showCardDialog = ref(false)
 const { load: loadCard, result: cardResult, loading: cardLoading } = useLazyQuery(GET_ADMIT_CARD)
 const cardData = computed(() => cardResult.value?.admitCard)
 
-const handleViewAdmitCard = async (row: any) => {
-  if (!row.registrationInfoId) {
-    ElMessage.warning('报名信息ID缺失')
-    return
+// === 核心数据转换 ===
+// 因为后端接口返回的是扁平结构，但组件 AdmitCard 需要结构化 Props
+// 所以我们需要在这里进行一次转换适配
+
+// 找到 MyExam.vue 中的 transformedStudent，替换为以下代码：
+
+const transformedStudent = computed(() => {
+  // 修改 1: 如果没有数据，返回 undefined，而不是空对象 {}
+  // 这样 AdmitCard 就会使用它内部定义的默认值，或者不渲染
+  if (!cardData.value) return undefined
+
+  return {
+    // 修改 2: 添加 "|| ''" 防止后端返回 null 导致类型报错
+    name: cardData.value.fullName || '', 
+    studentId: cardData.value.ticketNumber || '', 
+    department: '本科生院', 
+    // 注意: idCardNumber 如果 AdmitCard 的接口里没定义，传了也没用，但也不会报错
+    // 如果想要传头像，可以在这里加 avatar: ''
   }
+})
+
+const transformedExams = computed(() => {
+  if (!cardData.value) return []
+  // 组件期望的是一个数组，哪怕只有一个考试
+  return [{
+    subjectName: cardData.value.subjectName,
+    startTime: cardData.value.sessionStartTime,
+    endTime: cardData.value.sessionEndTime,
+    roomName: `${cardData.value.roomName} (${cardData.value.roomNumber})`,
+    seatNumber: cardData.value.seatNumber
+  }]
+})
+
+const transformedTemplate = computed(() => {
+  if (!cardData.value) return {}
+  return {
+    logoUrl: cardData.value.logoUrl,
+    examNotice: cardData.value.examNotice
+  }
+})
+// ===================
+
+const handleViewAdmitCard = async (row: any) => {
+  if (!row.registrationInfoId) return ElMessage.warning('ID缺失')
   showCardDialog.value = true
-  // 懒加载查询
-  loadCard(GET_ADMIT_CARD, { regId: row.registrationInfoId })
+  loadCard(null, { regId: row.registrationInfoId })
 }
 
 const printCard = () => {
-  window.print() // 简单调用浏览器打印，实际项目中可使用 print-js 打印局部
+  window.print()
 }
 
 // --- 工具函数 ---
@@ -178,20 +198,4 @@ const formatDate = (ts: string) => {
 .sub-text { font-size: 12px; color: #909399; }
 .pending-text { color: #dcdfe6; font-style: italic; }
 .center-name { font-weight: bold; color: #303133; }
-
-/* 准考证样式 */
-.card-box { border: 2px solid #303133; padding: 20px; border-radius: 8px; margin-top: 10px; }
-.card-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }
-.card-header h3 { margin: 0; }
-.ticket-no { font-family: monospace; font-weight: bold; font-size: 18px; }
-.exam-notice { margin-top: 20px; background: #f4f4f5; padding: 10px; border-radius: 4px; }
-.exam-notice h4 { margin: 0 0 5px 0; font-size: 14px; }
-.exam-notice p { margin: 0; font-size: 12px; color: #606266; line-height: 1.5; }
-
-/* 打印时的样式控制 */
-@media print {
-  body * { visibility: hidden; }
-  .admit-card-preview, .admit-card-preview * { visibility: visible; }
-  .admit-card-preview { position: absolute; left: 0; top: 0; width: 100%; }
-}
 </style>

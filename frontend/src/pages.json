@@ -4,7 +4,7 @@
       "id": "home",
       "name": "首页",
       "path": "/",
-      "component": "Dashboard", 
+      "component": "Dashboard",
       "meta": { "icon": "home" }
     },
     {
@@ -19,13 +19,13 @@
       "name": "考试安排管理",
       "path": "/scheduling",
       "component": "SchedulingManagement",
-      "meta": { "roles": ["ADMIN","TEACHER"], "icon": "calendar" }
+      "meta": { "roles": ["ADMIN", "TEACHER"], "icon": "calendar" }
     },
     {
       "id": "my-exam",
       "name": "我的考试",
       "path": "/my-exam",
-      "component": "MyExam", 
+      "component": "MyExam",
       "meta": { "roles": ["STUDENT"], "icon": "exam" }
     },
     {
@@ -56,6 +56,16 @@
       "meta": { "roles": ["STUDENT"], "icon": "application" }
     },
     {
+      "id": "student-notification",
+      "name": "通知公告",
+      "path": "/student/notification",
+      "component": "StudentNotification",
+      "meta": { 
+        "roles": ["STUDENT"], 
+        "icon": "bell" 
+      }
+    },
+    {
       "id": "exam-query",
       "name": "考试信息查询",
       "path": "/exam-query",
@@ -63,7 +73,7 @@
       "meta": { 
         "roles": ["ADMIN", "TEACHER"], 
         "icon": "search" 
-      }}
-    
+      }
+    }
   ]
 }

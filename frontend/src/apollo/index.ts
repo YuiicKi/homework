@@ -10,7 +10,7 @@ import { useUserStore } from '../stores/user' // 引入 user store
 
 const httpLink = createHttpLink({
 
-  uri: 'http://192.168.3.164:8080/graphql',
+  uri: 'http://172.20.10.2:8080/graphql',
 
 })
 

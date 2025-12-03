@@ -2,13 +2,13 @@
   <div class="registration-container">
     <el-card shadow="never">
       <div class="header">
-        <h2>我的考试报名</h2>
+        <h2>考试报名</h2>
         <p class="subtitle">查看可报名的科目，追踪审核状态，审核通过后请及时缴费</p>
       </div>
 
       <div class="filter-bar">
         <el-alert 
-          title="温馨提示：如状态为“已驳回”，请将鼠标悬停在红色图标上查看原因，并点击“修改重交”。" 
+          title="温馨提示：如状态为“已驳回”，请重新提交报名信息。" 
           type="info" 
           show-icon 
           :closable="false" 
@@ -40,19 +40,19 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="当前状态" align="center" width="160">
+        <el-table-column label="状态/说明" align="center" width="160">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" effect="dark" size="default">
-              {{ getStatusText(row.status) }}
+              {{ row.actionLabel || getStatusText(row.status) }}
             </el-tag>
             
             <el-tooltip 
-              v-if="row.status === 'REJECTED' && row.auditReason"
+              v-if="row.note"
               effect="dark" 
-              :content="'驳回原因: ' + row.auditReason" 
+              :content="row.note" 
               placement="top"
             >
-              <el-icon class="reject-icon"><Warning /></el-icon>
+              <el-icon class="info-icon"><Warning /></el-icon>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -61,46 +61,31 @@
           <template #default="{ row }">
             
             <el-button 
-              v-if="row.status === 'NOT_REGISTERED'"
+              v-if="row.status === 'OPEN'"
               type="primary" 
               size="small"
-              :disabled="!isRegisteringTime(row)"
               @click="openRegisterDialog(row)"
             >
-              {{ isRegisteringTime(row) ? '立即报名' : '未开放' }}
+              立即报名
             </el-button>
 
             <el-button 
-              v-else-if="row.status === 'PENDING'"
+              v-else-if="row.status === 'NOT_STARTED'"
               plain
               size="small"
               disabled
             >
-              审核中...
+              未开始
             </el-button>
 
             <el-button 
-              v-else-if="row.status === 'REJECTED'"
-              type="danger" 
-              size="small"
+              v-else
               plain
-              @click="openReSubmitDialog(row)"
-            >
-              修改重交
-            </el-button>
-
-            <el-button 
-              v-else-if="row.status === 'APPROVED'"
-              type="success" 
               size="small"
-              @click="handlePay(row)"
+              disabled
             >
-              去缴费
+              已结束
             </el-button>
-
-             <div v-else-if="row.status === 'PAID'" style="color: #67c23a; font-size: 12px;">
-              <el-icon><CircleCheckFilled /></el-icon> 报名完成
-            </div>
 
           </template>
         </el-table-column>
@@ -109,20 +94,11 @@
 
     <el-dialog 
       v-model="showDialog" 
-      :title="isResubmit ? '修改报名信息' : '填写报名信息'" 
+      title="填写报名信息" 
       width="550px"
       destroy-on-close
       :close-on-click-modal="false"
     >
-      <el-alert 
-        v-if="isResubmit && currentExam.auditReason"
-        :title="`上次驳回原因：${currentExam.auditReason}`"
-        type="error"
-        show-icon
-        :closable="false"
-        style="margin-bottom: 20px;"
-      />
-
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="报考科目">
           <el-input :value="currentExam.subjectName" disabled />
@@ -149,16 +125,12 @@
           </el-upload>
           <div class="upload-tip">请上传本人近期免冠证件照 (JPG/PNG, &lt;2MB)</div>
         </el-form-item>
-
-        <el-form-item label="备注说明" prop="remarks">
-          <el-input v-model="form.remarks" type="textarea" :rows="2" placeholder="如有特殊情况请在此说明" />
-        </el-form-item>
       </el-form>
 
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="submitting">
-          {{ isResubmit ? '重新提交' : '确认提交' }}
+          确认提交
         </el-button>
       </template>
     </el-dialog>
@@ -167,60 +139,70 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, nextTick } from 'vue'
-import { Plus, Warning, CircleCheckFilled, Refresh } from '@element-plus/icons-vue'
+import { Plus, Warning, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules, type UploadProps } from 'element-plus'
 import { gql } from '@apollo/client/core'
 import { useQuery, useMutation } from '@vue/apollo-composable'
 import dayjs from 'dayjs'
-import { useUserStore } from '../stores/user' // 确保路径正确
+import { useUserStore } from '../stores/user' 
 
 // --- GraphQL Definitions ---
-const GET_STUDENT_EXAMS = gql`
-  query GetStudentExams {
-    studentExams {
-      subjectId
+
+// 1. 查询可报名的考试 (Schema: availableExams)
+// 注意：Schema 中的 ExamRegistrationView 目前不直接返回 "用户的审核状态" (PENDING/REJECTED)
+// 这是一个 Schema 设计限制，我们暂时依赖 availableExams 列表
+const GET_AVAILABLE_EXAMS = gql`
+  query GetAvailableExams {
+    availableExams {
+      registrationId # 注意：Schema中可能是指SubjectID或WindowID，这里暂作为唯一标识
       subjectCode
       subjectName
-      registrationStartTime
-      registrationEndTime
       examStartTime
-      
-      # 报名记录信息
-      registrationId 
-      status          
-      auditReason
-      idCardNumber
-      photoUrl
-      remarks
+      registrationEndTime
+      status       # ExamRegistrationViewStatus: NOT_STARTED, OPEN, CLOSED
+      actionLabel  # 后端返回的操作文本，如 "去报名"
+      note
     }
   }
 `
 
-const SUBMIT_REGISTRATION = gql`
-  mutation SubmitRegistration($input: RegistrationInput!) {
-    submitRegistration(input: $input) {
+// 2. 提交基本信息 (Schema: upsertRegistrationInfo)
+const UPSERT_REGISTRATION_INFO = gql`
+  mutation UpsertInfo($input: RegistrationInfoInput!) {
+    upsertRegistrationInfo(input: $input) {
       id
       status
+      subjectId
+    }
+  }
+`
+
+// 3. 上传材料 (Schema: uploadRegistrationMaterial)
+// 照片在 Schema 中属于材料，需要单独上传
+const UPLOAD_MATERIAL = gql`
+  mutation UploadMaterial($input: RegistrationMaterialInput!) {
+    uploadRegistrationMaterial(input: $input) {
+      id
+      fileUrl
     }
   }
 `
 
 // --- Init & State ---
 const userStore = useUserStore()
-const { result, loading, refetch: refetchExams } = useQuery(GET_STUDENT_EXAMS)
-const { mutate: submitReg } = useMutation(SUBMIT_REGISTRATION)
+const { result, loading, refetch: refetchExams } = useQuery(GET_AVAILABLE_EXAMS)
+const { mutate: upsertInfo } = useMutation(UPSERT_REGISTRATION_INFO)
+const { mutate: uploadMaterial } = useMutation(UPLOAD_MATERIAL)
 
 const showDialog = ref(false)
 const submitting = ref(false)
-const isResubmit = ref(false)
 const formRef = ref<FormInstance>()
 const currentExam = ref<any>({}) 
 
 // 表单模型
 const form = reactive({
   idCardNumber: '',
-  photoUrl: '',
-  remarks: ''
+  photoUrl: ''
 })
 
 // 表单校验规则
@@ -233,86 +215,43 @@ const rules: FormRules = {
 }
 
 // --- Data Logic ---
-const myExamList = computed(() => {
-  const data = result.value?.studentExams
-  if (data) return data
+// 安全获取列表，移除 Mock 数据
+const myExamList = computed(() => result.value?.availableExams || [])
 
-  // --- Mock Data ---
-  // 修复点 2: 删除了未使用的 'const now = dayjs().valueOf()'
-  return [
-    {
-      subjectId: '101', subjectCode: 'CS101', subjectName: '数据结构与算法', 
-      registrationStartTime: String(dayjs().subtract(2, 'day').valueOf()),
-      registrationEndTime: String(dayjs().add(5, 'day').valueOf()),
-      examStartTime: String(dayjs().add(15, 'day').valueOf()),
-      status: 'REJECTED', 
-      auditReason: '证件照非本人，请重新上传',
-      idCardNumber: '110101200001011234',
-      photoUrl: '', 
-      registrationId: 'reg_001',
-      remarks: ''
-    },
-    {
-      subjectId: '102', subjectCode: 'ENG202', subjectName: '大学英语六级', 
-      registrationStartTime: String(dayjs().subtract(1, 'day').valueOf()),
-      registrationEndTime: String(dayjs().add(3, 'day').valueOf()),
-      examStartTime: String(dayjs().add(20, 'day').valueOf()),
-      status: 'APPROVED', 
-      registrationId: 'reg_002',
-      idCardNumber: '110101200001011234',
-      photoUrl: 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png',
-      remarks: '无'
-    },
-    {
-      subjectId: '103', subjectCode: 'MATH101', subjectName: '高等数学(下)', 
-      registrationStartTime: String(dayjs().subtract(5, 'day').valueOf()),
-      registrationEndTime: String(dayjs().add(10, 'day').valueOf()),
-      examStartTime: String(dayjs().add(30, 'day').valueOf()),
-      status: 'NOT_REGISTERED', 
-      registrationId: null,
-      idCardNumber: '', photoUrl: '', remarks: ''
-    },
-    {
-      subjectId: '104', subjectCode: 'PHY101', subjectName: '大学物理', 
-      registrationStartTime: String(dayjs().subtract(5, 'day').valueOf()),
-      registrationEndTime: String(dayjs().add(10, 'day').valueOf()),
-      examStartTime: String(dayjs().add(30, 'day').valueOf()),
-      status: 'PENDING', 
-      registrationId: 'reg_004',
-      idCardNumber: '110101...', photoUrl: 'http://...', remarks: ''
-    }
-  ]
-})
 
 // --- Helper Functions ---
-const formatDate = (ts: string) => dayjs(Number(ts)).format('YYYY-MM-DD HH:mm')
+// 增强版日期格式化：兼容 ISO 字符串和时间戳
+const formatDate = (ts: string | number) => {
+  if (!ts) return '-'
+  
+  // 1. 尝试作为数字解析 (处理时间戳字符串 "1679...")
+  const numDate = Number(ts)
+  if (!isNaN(numDate)) {
+    return dayjs(numDate).format('YYYY-MM-DD HH:mm')
+  }
 
-const isRegisteringTime = (row: any) => {
-  const now = dayjs().valueOf()
-  return now >= Number(row.registrationStartTime) && now <= Number(row.registrationEndTime)
+  // 2. 尝试直接解析 (处理 ISO 字符串 "2025-01-01T...")
+  const directDate = dayjs(ts)
+  if (directDate.isValid()) {
+    return directDate.format('YYYY-MM-DD HH:mm')
+  }
+
+  return '-'
 }
 
-const getStatusText = (s: string) => ({ 'NOT_REGISTERED':'未报名', 'PENDING':'审核中', 'APPROVED':'待缴费', 'REJECTED':'已驳回', 'PAID':'已完成' }[s] || s)
-const getStatusType = (s: string) => ({ 'NOT_REGISTERED':'info', 'PENDING':'warning', 'APPROVED':'success', 'REJECTED':'danger', 'PAID':'success' }[s] || 'info')
+// 同时也检查一下 isRegisteringTime 函数，确保比较逻辑正确
+
+
+const getStatusText = (s: string) => ({ 'NOT_STARTED':'未开始', 'OPEN':'报名中', 'CLOSED':'已截止' }[s] || s)
+const getStatusType = (s: string) => ({ 'NOT_STARTED':'info', 'OPEN':'success', 'CLOSED':'info' }[s] || 'info')
 
 // --- Action Handlers ---
 
 const openRegisterDialog = (row: any) => {
-  isResubmit.value = false
   currentExam.value = row
+  // 重置表单
   form.idCardNumber = '' 
   form.photoUrl = ''
-  form.remarks = ''
-  showDialog.value = true
-  nextTick(() => formRef.value?.clearValidate())
-}
-
-const openReSubmitDialog = (row: any) => {
-  isResubmit.value = true
-  currentExam.value = row
-  form.idCardNumber = row.idCardNumber || ''
-  form.photoUrl = row.photoUrl || ''
-  form.remarks = row.remarks || ''
   showDialog.value = true
   nextTick(() => formRef.value?.clearValidate())
 }
@@ -323,17 +262,37 @@ const handleSubmit = async () => {
     if (valid) {
       submitting.value = true
       try {
-        await submitReg({
+        // Step 1: 提交基本信息
+        // 注意：Schema 要求 subjectId, fullName, idCardNumber 等
+        // registrationId 在 availableExams 中很可能对应 SubjectId，如果不是，需要后端确认 Schema 字段含义
+        // 这里假设 row.registrationId 即为 SubjectId 或者后端能识别的 ID
+        const infoRes = await upsertInfo({
           input: {
-            examId: currentExam.value.subjectId,
-            studentName: userStore.fullName,
+            subjectId: currentExam.value.registrationId, 
+            fullName: userStore.fullName,
             idCardNumber: form.idCardNumber,
-            photoUrl: form.photoUrl,
-            remarks: form.remarks,
-            registrationId: isResubmit.value ? currentExam.value.registrationId : undefined
+            // 可以在这里补充 gender, phone 等，如果 userStore 有
           }
         })
-        ElMessage.success(isResubmit.value ? '已重新提交' : '报名成功，等待审核')
+
+        const registrationInfoId = infoRes?.data?.upsertRegistrationInfo?.id
+
+        if (!registrationInfoId) throw new Error('报名信息提交失败')
+
+        // Step 2: 如果有照片，提交照片材料
+        if (form.photoUrl) {
+          await uploadMaterial({
+            input: {
+              registrationInfoId: registrationInfoId,
+              type: 'PHOTO', // 假设材料类型为 PHOTO
+              fileUrl: form.photoUrl,
+              fileFormat: 'jpg', // 简单预设，实际应从文件获取
+              fileSize: 0 // 实际应从文件获取
+            }
+          })
+        }
+
+        ElMessage.success('报名成功')
         showDialog.value = false
         refetchExams()
       } catch (e: any) {
@@ -345,18 +304,12 @@ const handleSubmit = async () => {
   })
 }
 
-// 修复点 3: 使用了 row 参数
-const handlePay = (row: any) => {
-  ElMessage.success(`正在跳转 [${row.subjectName}] 的支付页面...`)
-  // router.push({ name: 'Payment', params: { id: row.registrationId } })
-}
-
-// 模拟图片上传
+// 模拟图片上传 (实际项目中应替换为真实文件上传接口，获取 HTTP URL)
 const mockUpload = (opts: any) => {
   const reader = new FileReader()
   reader.onload = (e) => { 
     form.photoUrl = e.target?.result as string; 
-    ElMessage.success('上传成功') 
+    ElMessage.success('图片已读取 (Mock)') 
     formRef.value?.validateField('photoUrl')
   }
   reader.readAsDataURL(opts.file)
@@ -375,14 +328,13 @@ const beforeAvatarUpload: UploadProps['beforeUpload'] = (file) => {
 .subtitle { color: #909399; font-size: 14px; margin-top: 5px; }
 .filter-bar { display: flex; align-items: center; margin-bottom: 20px; gap: 20px; }
 
-/* Table Content Styles */
 .subject-info { display: flex; flex-direction: column; }
 .code-tag { font-size: 12px; color: #909399; margin-top: 2px; font-family: monospace; }
 
 .time-cell { font-size: 13px; line-height: 1.6; color: #606266; display: flex; }
 .time-cell .label { color: #909399; width: 65px; text-align: right; margin-right: 8px; flex-shrink: 0; }
 
-.reject-icon { color: #f56c6c; margin-left: 8px; cursor: help; vertical-align: middle; font-size: 16px; }
+.info-icon { color: #e6a23c; margin-left: 5px; cursor: help; vertical-align: middle; }
 
 /* Upload Styles */
 .avatar-uploader .el-upload { border: 1px dashed var(--el-border-color); border-radius: 6px; cursor: pointer; position: relative; overflow: hidden; transition: .3s; }
