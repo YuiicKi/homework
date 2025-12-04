@@ -142,10 +142,9 @@ import { ref, reactive, computed, nextTick } from 'vue'
 import { Plus, Warning, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules, type UploadProps } from 'element-plus'
 import { gql } from '@apollo/client/core'
-import { useQuery, useMutation } from '@vue/apollo-composable'
 import dayjs from 'dayjs'
 import { useUserStore } from '../stores/user' 
-
+import { useQuery, useMutation, useApolloClient } from '@vue/apollo-composable' // 新增 useApolloClient
 // --- GraphQL Definitions ---
 
 // 1. 查询可报名的考试 (Schema: availableExams)
@@ -186,10 +185,23 @@ const UPLOAD_MATERIAL = gql`
       fileUrl
     }
   }
+`// 约第 142 行（在 UPLOAD_MATERIAL 下方添加）
+// 4. (方案B新增) 根据场次ID查询科目ID
+const GET_WINDOW_DETAIL = gql`
+  query GetWindowDetail($id: ID!) {
+    examRegistrationWindow(id: $id) {
+      id
+      subject {
+        id
+        name
+      }
+    }
+  }
 `
 
 // --- Init & State ---
 const userStore = useUserStore()
+const { client } = useApolloClient()
 const { result, loading, refetch: refetchExams } = useQuery(GET_AVAILABLE_EXAMS)
 const { mutate: upsertInfo } = useMutation(UPSERT_REGISTRATION_INFO)
 const { mutate: uploadMaterial } = useMutation(UPLOAD_MATERIAL)
@@ -256,38 +268,51 @@ const openRegisterDialog = (row: any) => {
   nextTick(() => formRef.value?.clearValidate())
 }
 
+// 约第 215 行左右，替换整个 handleSubmit 函数（或者修改其中的 try 块）
 const handleSubmit = async () => {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
     if (valid) {
       submitting.value = true
       try {
-        // Step 1: 提交基本信息
-        // 注意：Schema 要求 subjectId, fullName, idCardNumber 等
-        // registrationId 在 availableExams 中很可能对应 SubjectId，如果不是，需要后端确认 Schema 字段含义
-        // 这里假设 row.registrationId 即为 SubjectId 或者后端能识别的 ID
+        // --- 方案B 修改开始 ---
+        
+        // 1. 先用 registrationId (场次ID, 如8) 去查询详情，获取真正的 subjectId (科目ID, 如2)
+        const windowRes = await client.query({
+          query: GET_WINDOW_DETAIL,
+          variables: { id: currentExam.value.registrationId },
+          fetchPolicy: 'network-only' // 确保不走缓存
+        })
+
+        const realSubjectId = windowRes.data?.examRegistrationWindow?.subject?.id
+        
+        if (!realSubjectId) {
+          throw new Error('无法获取关联的科目信息，请联系管理员')
+        }
+
+        // 2. 使用查到的 realSubjectId 提交报名
         const infoRes = await upsertInfo({
           input: {
-            subjectId: currentExam.value.registrationId, 
+            subjectId: realSubjectId, // 这里填入刚才查到的正确ID
             fullName: userStore.fullName,
             idCardNumber: form.idCardNumber,
-            // 可以在这里补充 gender, phone 等，如果 userStore 有
           }
         })
+        // --- 方案B 修改结束 ---
 
         const registrationInfoId = infoRes?.data?.upsertRegistrationInfo?.id
 
         if (!registrationInfoId) throw new Error('报名信息提交失败')
 
-        // Step 2: 如果有照片，提交照片材料
+        // Step 3: 上传照片 (保持原逻辑不变)
         if (form.photoUrl) {
           await uploadMaterial({
             input: {
               registrationInfoId: registrationInfoId,
-              type: 'PHOTO', // 假设材料类型为 PHOTO
+              type: 'PHOTO',
               fileUrl: form.photoUrl,
-              fileFormat: 'jpg', // 简单预设，实际应从文件获取
-              fileSize: 0 // 实际应从文件获取
+              fileFormat: 'jpg',
+              fileSize: 0 
             }
           })
         }
@@ -296,6 +321,7 @@ const handleSubmit = async () => {
         showDialog.value = false
         refetchExams()
       } catch (e: any) {
+        console.error(e)
         ElMessage.error(e.message || '提交失败')
       } finally {
         submitting.value = false
