@@ -1,0 +1,10 @@
+target/
+**/target/
+build/
+.DS_Store
+**/.DS_Store
+.idea/
+*.class
+*.log
+.m2-temp/
+server/target/

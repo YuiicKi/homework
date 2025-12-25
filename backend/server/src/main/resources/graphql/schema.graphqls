@@ -1,0 +1,1450 @@
+# RBAC V1 GraphQL Schema
+
+"""
+用户账户
+"""
+type User {
+  id: ID!
+  phone: String
+  isActive: Boolean
+  createdAt: String
+  fullName: String
+  roles: [Role!]!
+  profile: UserProfile
+}
+
+"""
+角色定义
+"""
+type Role {
+  id: ID!
+  name: String!
+  description: String
+}
+
+"""
+考生信息
+"""
+type StudentProfile {
+  fullName: String
+  idCardNumber: String
+  photoUrl: String
+}
+
+"""
+教师 / 监考信息
+"""
+type TeacherProfile {
+  fullName: String
+  staffId: String
+  schoolOrDepartment: String
+}
+
+"""
+考务人员信息
+"""
+type AdminProfile {
+  fullName: String
+  staffId: String
+  department: String
+}
+
+"""
+联合类型，根据角色返回对应 profile
+"""
+union UserProfile = StudentProfile | TeacherProfile | AdminProfile
+
+"""
+认证成功后的返回载荷
+"""
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+"""
+考生注册输入
+"""
+input StudentRegisterInput {
+  phone: String!
+  password: String!
+  fullName: String!
+  idCardNumber: String
+  photoUrl: String
+}
+
+"""
+管理员创建用户输入
+"""
+input AdminCreateUserInput {
+  phone: String!
+  password: String!
+  roleName: String!
+  fullName: String!
+  staffId: String
+  schoolOrDepartment: String
+  department: String
+}
+
+"""
+管理员更新用户输入
+"""
+input UpdateUserInput {
+  phone: String
+  isActive: Boolean
+}
+
+enum ExamRoomStatus {
+  AVAILABLE
+  UNAVAILABLE
+  MAINTENANCE
+}
+
+enum ExamScheduleStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum ExamSubjectStatus {
+  ENABLED
+  DISABLED
+}
+
+enum ExamRegistrationStatus {
+  ENABLED
+  DISABLED
+}
+
+enum ExamRegistrationViewStatus {
+  NOT_STARTED
+  OPEN
+  CLOSED
+}
+
+"""
+考点
+"""
+type ExamCenter {
+  id: ID!
+  name: String!
+  address: String
+  description: String
+}
+
+"""
+考场状态日志
+"""
+type ExamRoomStatusLog {
+  id: ID!
+  fromStatus: ExamRoomStatus
+  toStatus: ExamRoomStatus!
+  reason: String
+  createdAt: String
+}
+
+"""
+考场
+"""
+type ExamRoom {
+  id: ID!
+  roomNumber: String!
+  name: String
+  status: ExamRoomStatus!
+  capacity: Int
+  location: String
+  managerName: String
+  managerPhone: String
+  center: ExamCenter!
+  statusLogs: [ExamRoomStatusLog!]!
+}
+
+"""
+科目
+"""
+type ExamSubject {
+  id: ID!
+  code: String!
+  name: String!
+  status: ExamSubjectStatus!
+  durationMinutes: Int!
+  questionCount: Int!
+  description: String
+  logs: [ExamSubjectLog!]!
+}
+
+"""
+科目状态日志
+"""
+type ExamSubjectLog {
+  id: ID!
+  fromStatus: ExamSubjectStatus
+  toStatus: ExamSubjectStatus
+  reason: String
+  operatorId: ID
+  createdAt: String
+}
+
+"""
+报名时间配置
+"""
+type ExamRegistrationWindow {
+  id: ID!
+  startTime: String!
+  endTime: String!
+  status: ExamRegistrationStatus!
+  note: String
+  subject: ExamSubject!
+  session: ExamSession!
+  logs: [ExamRegistrationWindowLog!]!
+}
+
+"""
+报名时间配置状态日志
+"""
+type ExamRegistrationWindowLog {
+  id: ID!
+  fromStatus: ExamRegistrationStatus
+  toStatus: ExamRegistrationStatus
+  reason: String
+  operatorId: ID
+  createdAt: String
+}
+
+"""
+通知
+"""
+type Notification {
+  id: ID!
+  title: String!
+  type: String!
+  content: String!
+  channel: String!
+  status: String!
+  scheduledAt: String
+  createdBy: ID
+  createdAt: String
+  updatedAt: String
+  targets: [NotificationTarget!]!
+  logs: [NotificationLog!]!
+}
+
+"""
+通知目标
+"""
+type NotificationTarget {
+  id: ID!
+  targetType: String!
+  targetValue: String
+}
+
+"""
+通知日志
+"""
+type NotificationLog {
+  id: ID!
+  channel: String!
+  target: String!
+  status: String!
+  error: String
+  createdAt: String
+}
+
+"""
+通知模板
+"""
+type NotificationTemplate {
+  id: ID!
+  name: String!
+  type: String!
+  content: String!
+  variables: String
+}
+
+"""
+座位分配
+"""
+type SeatAssignment {
+  id: ID!
+  registrationInfoId: ID!
+  subjectId: ID
+  sessionId: ID
+  roomId: ID
+  seatNumber: Int
+  ticketNumber: String
+  status: String
+}
+
+"""
+座位分配任务
+"""
+type SeatAssignmentTask {
+  id: ID!
+  subjectId: ID
+  sessionId: ID
+  algorithm: String
+  registrationsCount: Int
+  assignedCount: Int
+  createdBy: ID
+  createdAt: String
+}
+
+"""
+座位分配统计
+"""
+type SeatAssignmentStats {
+  subjectId: ID
+  sessionId: ID
+  registrationCount: Int
+  assignmentCount: Int
+  availableRooms: Int
+}
+
+input SeatAssignmentInput {
+  subjectId: ID!
+  sessionId: ID!
+}
+
+"""
+成绩查询输入
+"""
+input ExamResultQueryInput {
+  examType: String!
+  examYear: Int!
+  fullName: String
+  idCardNumber: String
+  ticketNumber: String
+}
+
+"""
+单科成绩录入
+"""
+input ExamResultDetailInput {
+  subjectId: ID
+  subjectName: String!
+  score: Float!
+  passLine: Float
+  isPass: Boolean
+  nationalRank: Int
+  remark: String
+}
+
+"""
+成绩录入
+"""
+input UpsertExamResultInput {
+  registrationInfoId: ID!
+  examType: String!
+  examYear: Int!
+  ticketNumber: String
+  releaseTime: String
+  totalScore: Float
+  totalPassLine: Float
+  qualificationStatus: String
+  qualificationNote: String
+  reportUrl: String
+  subjects: [ExamResultDetailInput!]!
+}
+
+"""
+我的考试安排
+"""
+type MyExamSchedule {
+  registrationInfoId: ID!
+  subjectId: ID
+  subjectName: String
+  sessionId: ID
+  sessionName: String
+  sessionStartTime: String
+  sessionEndTime: String
+  centerName: String
+  roomName: String
+  roomNumber: String
+  seatNumber: Int
+  ticketNumber: String
+}
+
+"""
+考试成绩科目详情
+"""
+type ExamResultDetail {
+  subjectId: ID
+  subjectName: String
+  score: Float
+  passLine: Float
+  isPass: Boolean
+  nationalRank: Int
+  remark: String
+}
+
+"""
+考试成绩查询结果
+"""
+type ExamResult {
+  resultId: ID!
+  registrationInfoId: ID
+  fullName: String
+  idCardNumber: String
+  examType: String!
+  examYear: Int!
+  ticketNumber: String
+  releaseTime: String
+  totalScore: Float
+  totalPassLine: Float
+  qualificationStatus: String
+  qualificationNote: String
+  isQualified: Boolean
+  reportUrl: String
+  subjects: [ExamResultDetail!]!
+}
+
+"""
+成绩查询预告
+"""
+type ExamResultPreNotification {
+  id: ID!
+  examType: String!
+  examYear: Int!
+  queryTime: String!
+  title: String!
+  content: String!
+  status: String!
+  lastNotificationId: ID
+  lastPublishedAt: String
+  createdBy: ID
+  createdAt: String
+  updatedAt: String
+}
+
+"""
+成绩查询预告输入
+"""
+input ExamResultPreNotificationInput {
+  examType: String!
+  examYear: Int!
+  queryTime: String!
+  title: String!
+  content: String!
+}
+
+"""
+成绩发布时间设置
+"""
+type ExamResultReleaseSetting {
+  id: ID!
+  subjectId: ID
+  subjectName: String
+  examYear: Int!
+  releaseTime: String!
+  preNoticeOffsetMinutes: Int
+  preNotificationId: ID
+  preNotificationTitle: String
+  preNotificationContent: String
+  preNoticeTriggeredAt: String
+  autoReleaseTriggeredAt: String
+  createdBy: ID
+  createdAt: String
+  updatedAt: String
+}
+
+"""
+成绩发布时间设置输入
+"""
+input ExamResultReleaseSettingInput {
+  subjectId: ID!
+  examYear: Int!
+  releaseTime: String!
+  preNoticeOffsetMinutes: Int
+  preNotificationTitle: String
+  preNotificationContent: String
+}
+
+"""
+成绩发布时间批量设置
+"""
+input ExamResultReleaseBatchInput {
+  subjectIds: [ID!]!
+  examYear: Int!
+  releaseTime: String!
+  preNoticeOffsetMinutes: Int
+  preNotificationTitle: String
+  preNotificationContent: String
+}
+
+"""
+电子合格证
+"""
+type ExamCertificate {
+  fileName: String!
+  mimeType: String!
+  contentBase64: String!
+}
+
+"""
+电子证书查询输入
+"""
+input ExamCertificateRequestInput {
+  examType: String!
+  examYear: Int!
+  fullName: String!
+  ticketNumber: String!
+  idCardNumber: String
+}
+
+"""
+监考分配
+"""
+type InvigilatorAssignment {
+  id: ID!
+  scheduleId: ID
+  teacherUserId: ID
+  teacherName: String
+  teacherPhone: String
+  subjectName: String
+  sessionName: String
+  sessionStartTime: String
+  sessionEndTime: String
+  centerName: String
+  centerAddress: String
+  roomName: String
+  roomNumber: String
+  assignedBy: ID
+  assignedAt: String
+}
+
+"""
+监考分配统计
+"""
+type InvigilatorAssignmentStats {
+  totalSchedules: Int!
+  assignedSchedules: Int!
+  availableTeachers: Int!
+}
+
+input AssignInvigilatorsInput {
+  scheduleId: ID!
+  teacherUserIds: [ID!]!
+  replaceExisting: Boolean
+}
+
+enum ExamResultImportJobStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
+enum ExamResultImportItemStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+type ExamResultImportItem {
+  id: ID!
+  jobId: ID!
+  rowNumber: Int
+  registrationInfoId: ID
+  ticketNumber: String
+  subjectId: ID
+  status: ExamResultImportItemStatus!
+  message: String
+  createdAt: String
+}
+
+type ExamResultImportJob {
+  id: ID!
+  fileName: String!
+  fileSize: Int
+  fileType: String
+  status: ExamResultImportJobStatus!
+  totalCount: Int
+  successCount: Int
+  failureCount: Int
+  errorMessage: String
+  createdBy: ID
+  createdAt: String
+  completedAt: String
+  items: [ExamResultImportItem!]!
+}
+
+type ExamResultImportTemplate {
+  fileName: String!
+  mimeType: String!
+  contentBase64: String!
+}
+
+input ExamResultImportInput {
+  fileName: String!
+  contentBase64: String!
+}
+
+"""
+准考证
+"""
+type AdmitCard {
+  registrationInfoId: ID!
+  ticketNumber: String!
+  subjectName: String
+  sessionName: String
+  sessionStartTime: String
+  sessionEndTime: String
+  roomName: String
+  roomNumber: String
+  seatNumber: Int
+  fullName: String
+  idCardNumber: String
+  examNotice: String
+  logoUrl: String
+  qrContent: String
+  filePath: String
+}
+
+"""
+准考证模板
+"""
+type AdmitCardTemplate {
+  id: ID!
+  name: String!
+  logoUrl: String
+  examNotice: String
+  qrStyle: String
+}
+
+"""
+准考证生成日志
+"""
+type AdmitCardLog {
+  id: ID!
+  registrationInfoId: ID!
+  ticketNumber: String!
+  filePath: String
+  status: String
+  message: String
+  createdAt: String
+}
+
+input AdmitCardTemplateInput {
+  id: ID
+  name: String!
+  logoUrl: String
+  examNotice: String
+  qrStyle: String
+}
+
+"""
+前台展示的可报名考试
+"""
+type ExamRegistrationView {
+  registrationId: ID!
+  subjectCode: String!
+  subjectName: String!
+  sessionId: ID
+  sessionName: String
+  examStartTime: String
+  examEndTime: String
+  registrationStartTime: String!
+  registrationEndTime: String!
+  status: ExamRegistrationViewStatus!
+  actionLabel: String!
+  note: String
+}
+
+"""
+场次
+"""
+type ExamSession {
+  id: ID!
+  name: String!
+  startTime: String!
+  endTime: String!
+  note: String
+}
+
+"""
+排考关联
+"""
+type ExamSchedule {
+  id: ID!
+  examRoom: ExamRoom!
+  examSubject: ExamSubject!
+  examSession: ExamSession!
+  status: ExamScheduleStatus!
+  note: String
+}
+
+input ExamCenterInput {
+  name: String!
+  address: String
+  description: String
+}
+
+input ExamRoomInput {
+  centerId: ID!
+  roomNumber: String!
+  name: String
+  capacity: Int
+  location: String
+  managerName: String
+  managerPhone: String
+}
+
+input UpdateExamRoomStatusInput {
+  roomId: ID!
+  status: ExamRoomStatus!
+  reason: String
+}
+
+input ExamSubjectInput {
+  code: String!
+  name: String!
+  durationMinutes: Int!
+  questionCount: Int!
+  description: String
+}
+
+input ExamSessionInput {
+  name: String!
+  startTime: String!
+  endTime: String!
+  note: String
+}
+
+input ExamScheduleInput {
+  roomId: ID!
+  subjectId: ID!
+  sessionId: ID!
+  note: String
+}
+
+input UpdateExamScheduleStatusInput {
+  scheduleId: ID!
+  status: ExamScheduleStatus!
+}
+
+input UpdateExamSubjectStatusInput {
+  subjectId: ID!
+  status: ExamSubjectStatus!
+  reason: String
+}
+
+input BatchExamSubjectStatusInput {
+  subjectIds: [ID!]!
+  status: ExamSubjectStatus!
+  reason: String
+}
+
+input BatchDeleteExamSubjectInput {
+  subjectIds: [ID!]!
+}
+
+input ExamRegistrationWindowInput {
+  subjectId: ID!
+  sessionId: ID!
+  startTime: String!
+  endTime: String!
+  note: String
+}
+
+input UpdateExamRegistrationStatusInput {
+  registrationId: ID!
+  status: ExamRegistrationStatus!
+  reason: String
+}
+
+input BatchUpdateExamRegistrationStatusInput {
+  registrationIds: [ID!]!
+  status: ExamRegistrationStatus!
+  reason: String
+}
+
+input BatchDeleteExamRegistrationInput {
+  registrationIds: [ID!]!
+}
+
+input NotificationTargetInput {
+  targetType: String!
+  targetValue: String
+}
+
+input NotificationInput {
+  title: String!
+  type: String!
+  content: String!
+  channel: String!
+  scheduledAt: String
+  targets: [NotificationTargetInput!]!
+}
+
+input NotificationTemplateInput {
+  name: String!
+  type: String!
+  content: String!
+  variables: String
+}
+
+input PublishNotificationInput {
+  notificationId: ID!
+}
+
+"""
+报名材料模板
+"""
+type RegistrationMaterialTemplate {
+  id: ID!
+  type: String!
+  allowedFormats: String
+  maxSize: Int
+  required: Boolean
+  description: String
+}
+
+"""
+报名材料
+"""
+type RegistrationMaterial {
+  id: ID!
+  type: String!
+  fileUrl: String!
+  fileFormat: String
+  fileSize: Int
+  status: String
+  note: String
+}
+
+"""
+报名审核日志
+"""
+type RegistrationAuditLog {
+  id: ID!
+  registrationInfoId: ID!
+  result: String!
+  reason: String
+  operatorId: ID
+  createdAt: String
+}
+
+"""
+报名信息
+"""
+type RegistrationInfo {
+  id: ID!
+  userId: ID
+  subjectId: ID
+  fullName: String!
+  idCardNumber: String!
+  gender: String
+  birthDate: String
+  phone: String
+  email: String
+  status: String
+  materials: [RegistrationMaterial!]!
+  requiredMaterials: [RegistrationMaterialTemplate!]!
+}
+
+input RegistrationInfoInput {
+  subjectId: ID!
+  sessionId: ID!
+  fullName: String!
+  idCardNumber: String!
+  gender: String
+  birthDate: String
+  phone: String
+  email: String
+}
+
+input RegistrationMaterialInput {
+  registrationInfoId: ID!
+  type: String!
+  fileUrl: String!
+  fileFormat: String!
+  fileSize: Int!
+  note: String
+}
+
+input RegistrationMaterialTemplateInput {
+  id: ID
+  type: String!
+  allowedFormats: String
+  maxSize: Int
+  required: Boolean
+  description: String
+}
+
+input RegistrationRejectInput {
+  registrationInfoId: ID!
+  reason: String!
+}
+
+type Query {
+  """
+  获取当前登录的用户信息
+  """
+  me: User
+
+  """
+  (Admin) 获取所有用户列表，可按角色筛选
+  """
+  users(role: String): [User!]!
+
+  """
+  (Admin) 获取单个用户信息
+  """
+  user(id: ID!): User
+
+  """
+  (Admin) 获取所有角色
+  """
+  roles: [Role!]!
+
+  """
+  查询考点列表
+  """
+  examCenters: [ExamCenter!]!
+  """
+  导出考点列表
+  """
+  exportExamCenters: [ExamCenter!]!
+
+  """
+  查询考点详情
+  """
+  examCenter(id: ID!): ExamCenter
+
+  """
+  查询考场列表，可按考点过滤
+  """
+  examRooms(centerId: ID): [ExamRoom!]!
+  """
+  导出考场列表
+  """
+  exportExamRooms(centerId: ID): [ExamRoom!]!
+
+  """
+  查询考场详情
+  """
+  examRoom(id: ID!): ExamRoom
+
+  """
+  查询科目列表
+  """
+  examSubjects(keyword: String, status: ExamSubjectStatus): [ExamSubject!]!
+
+  """
+  查询科目详情
+  """
+  examSubject(id: ID!): ExamSubject
+
+  """
+  导出科目列表
+  """
+  exportExamSubjects(keyword: String, status: ExamSubjectStatus): [ExamSubject!]!
+
+  """
+  查询科目状态日志
+  """
+  examSubjectLogs(subjectId: ID!): [ExamSubjectLog!]!
+
+  """
+  查询报名时间配置列表
+  """
+  examRegistrationWindows(subjectId: ID, status: ExamRegistrationStatus): [ExamRegistrationWindow!]!
+
+  """
+  查询报名时间配置详情
+  """
+  examRegistrationWindow(id: ID!): ExamRegistrationWindow
+
+  """
+  导出报名时间配置列表
+  """
+  exportExamRegistrationWindows(subjectId: ID, status: ExamRegistrationStatus): [ExamRegistrationWindow!]!
+
+  """
+  报名时间配置日志
+  """
+  examRegistrationWindowLogs(registrationId: ID!): [ExamRegistrationWindowLog!]!
+
+  """
+  前台可报名考试列表
+  """
+  availableExams(keyword: String, status: ExamRegistrationViewStatus): [ExamRegistrationView!]!
+
+  """
+  前台可报名考试详情
+  """
+  availableExam(id: ID!): ExamRegistrationView
+
+  """
+  查询场次列表
+  """
+  examSessions: [ExamSession!]!
+
+  """
+  查询场次详情
+  """
+  examSession(id: ID!): ExamSession
+
+  """
+  查询排考列表，可按考场/科目/场次过滤
+  """
+  examSchedules(roomId: ID, subjectId: ID, sessionId: ID): [ExamSchedule!]!
+
+  """
+  查询排考详情
+  """
+  examSchedule(id: ID!): ExamSchedule
+
+  """
+  通知列表
+  """
+  notifications(keyword: String, status: String): [Notification!]!
+
+  """
+  通知详情
+  """
+  notification(id: ID!): Notification
+
+  """
+  通知模板列表
+  """
+  notificationTemplates: [NotificationTemplate!]!
+
+  """
+  通知模板详情
+  """
+  notificationTemplate(id: ID!): NotificationTemplate
+
+  """
+  通知日志
+  """
+  notificationLogs(id: ID!): [NotificationLog!]!
+
+  """
+  当前报名信息（含材料与必填要求）
+  """
+  registrationInfo(subjectId: ID!): RegistrationInfo
+
+  """
+  报名材料模板列表
+  """
+  registrationMaterialTemplates: [RegistrationMaterialTemplate!]!
+
+  """
+  (Admin) 待审核报名列表
+  """
+  pendingRegistrations: [RegistrationInfo!]!
+
+  """
+  (Admin) 报名审核详情
+  """
+  registrationAuditDetail(id: ID!): RegistrationInfo
+
+  """
+  (Admin) 报名审核日志
+  """
+  registrationAuditLogs(registrationInfoId: ID!): [RegistrationAuditLog!]!
+
+  """
+  座位分配列表
+  """
+  seatAssignments(subjectId: ID, sessionId: ID, roomId: ID, registrationInfoId: ID): [SeatAssignment!]!
+
+  """
+  座位分配统计
+  """
+  seatAssignmentStats(subjectId: ID!, sessionId: ID!): SeatAssignmentStats!
+
+  """
+  座位分配任务记录
+  """
+  seatAssignmentTasks(subjectId: ID!, sessionId: ID!): [SeatAssignmentTask!]!
+
+  """
+  我的准考证
+  """
+  admitCard(registrationInfoId: ID!, templateId: ID): AdmitCard
+
+  """
+  准考证模板列表
+  """
+  admitCardTemplates: [AdmitCardTemplate!]!
+
+  """
+  准考证生成日志
+  """
+  admitCardLogs(registrationInfoId: ID!): [AdmitCardLog!]!
+
+  """
+  我的考试安排（按科目可选过滤）
+  """
+  myExamSchedules(subjectId: ID): [MyExamSchedule!]!
+
+  """
+  成绩查询
+  """
+  examResult(input: ExamResultQueryInput!): ExamResult
+
+  """
+  (Admin) 批量查询成绩（按报名ID列表）
+  """
+  examResultsByRegistrationIds(registrationInfoIds: [ID!]!): [ExamResult!]!
+
+  """
+  (Admin) 成绩查询预告列表
+  """
+  resultPreNotifications: [ExamResultPreNotification!]!
+
+  """
+  (Admin) 成绩查询预告详情
+  """
+  resultPreNotification(id: ID!): ExamResultPreNotification
+
+  """
+  (Admin) 成绩发布时间设置列表
+  """
+  resultReleaseSettings(subjectId: ID, examYear: Int): [ExamResultReleaseSetting!]!
+
+  """
+  (Admin) 成绩发布时间设置详情
+  """
+  resultReleaseSetting(id: ID!): ExamResultReleaseSetting
+
+  """
+  成绩导入模板
+  """
+  resultImportTemplate(format: String): ExamResultImportTemplate!
+
+  """
+  (Admin) 成绩导入记录
+  """
+  examResultImportJobs(status: ExamResultImportJobStatus, limit: Int): [ExamResultImportJob!]!
+
+  """
+  (Admin) 成绩导入详情
+  """
+  examResultImportJob(id: ID!): ExamResultImportJob
+
+  """
+  电子合格证书下载
+  """
+  examCertificate(input: ExamCertificateRequestInput!): ExamCertificate!
+
+  """
+  (Admin) 监考任务分配
+  """
+  invigilatorAssignments(scheduleId: ID, teacherUserId: ID): [InvigilatorAssignment!]!
+
+  """
+  (Admin) 监考分配统计
+  """
+  invigilatorAssignmentStats(subjectId: ID, sessionId: ID): InvigilatorAssignmentStats!
+}
+
+type Mutation {
+  """
+  (Public) 考生注册
+  """
+  registerStudent(input: StudentRegisterInput!): AuthPayload!
+
+  """
+  (Public) 用户登录 (手机号或用户名)
+  """
+  login(phone: String!, password: String!): AuthPayload!
+
+  """
+  (Admin) 管理员添加用户 (考务 / 教师)
+  """
+  adminCreateUser(input: AdminCreateUserInput!): User!
+
+  """
+  (Admin) 更新用户信息
+  """
+  updateUser(id: ID!, input: UpdateUserInput!): User!
+
+  """
+  (Admin) 删除用户
+  """
+  deleteUser(id: ID!): Boolean!
+
+  """
+  (Admin) 创建新角色
+  """
+  createRole(name: String!, description: String): Role!
+
+  """
+  (Admin) 更新角色
+  """
+  updateRole(id: ID!, name: String, description: String): Role!
+
+  """
+  (Admin) 删除角色
+  """
+  deleteRole(id: ID!): Boolean!
+
+  """
+  (Admin) 为用户分配角色
+  """
+  assignRoleToUser(userId: ID!, roleId: ID!): User!
+
+  """
+  (Admin) 移除用户角色
+  """
+  removeRoleFromUser(userId: ID!, roleId: ID!): User!
+
+  """
+  (Admin) 创建考点
+  """
+  createExamCenter(input: ExamCenterInput!): ExamCenter!
+
+  """
+  (Admin) 更新考点
+  """
+  updateExamCenter(id: ID!, input: ExamCenterInput!): ExamCenter!
+
+  """
+  (Admin) 删除考点
+  """
+  deleteExamCenter(id: ID!): Boolean!
+
+  """
+  (Admin) 批量导入考点
+  """
+  importExamCenters(inputs: [ExamCenterInput!]!): [ExamCenter!]!
+
+  """
+  (Admin) 创建考场
+  """
+  createExamRoom(input: ExamRoomInput!): ExamRoom!
+
+  """
+  (Admin) 更新考场
+  """
+  updateExamRoom(id: ID!, input: ExamRoomInput!): ExamRoom!
+
+  """
+  (Admin) 变更考场状态并记录日志
+  """
+  changeExamRoomStatus(input: UpdateExamRoomStatusInput!): ExamRoom!
+
+  """
+  (Admin) 批量导入考场
+  """
+  importExamRooms(inputs: [ExamRoomInput!]!): [ExamRoom!]!
+
+  """
+  (Admin) 创建科目
+  """
+  createExamSubject(input: ExamSubjectInput!): ExamSubject!
+
+  """
+  (Admin) 更新科目
+  """
+  updateExamSubject(id: ID!, input: ExamSubjectInput!): ExamSubject!
+
+  """
+  (Admin) 更新科目状态
+  """
+  updateExamSubjectStatus(input: UpdateExamSubjectStatusInput!): ExamSubject!
+
+  """
+  (Admin) 批量更新科目状态
+  """
+  batchUpdateExamSubjectStatus(input: BatchExamSubjectStatusInput!): [ExamSubject!]!
+
+  """
+  (Admin) 批量删除科目
+  """
+  batchDeleteExamSubjects(input: BatchDeleteExamSubjectInput!): Boolean!
+
+  """
+  (Admin) 导入科目
+  """
+  importExamSubjects(inputs: [ExamSubjectInput!]!): [ExamSubject!]!
+
+  """
+  (Admin) 创建或更新报名时间配置
+  """
+  upsertExamRegistrationWindow(id: ID, input: ExamRegistrationWindowInput!): ExamRegistrationWindow!
+
+  """
+  (Admin) 更新报名时间配置状态
+  """
+  updateExamRegistrationWindowStatus(input: UpdateExamRegistrationStatusInput!): ExamRegistrationWindow!
+
+  """
+  (Admin) 批量更新报名时间配置状态
+  """
+  batchUpdateExamRegistrationWindowStatus(input: BatchUpdateExamRegistrationStatusInput!): [ExamRegistrationWindow!]!
+
+  """
+  (Admin) 批量删除报名时间配置
+  """
+  batchDeleteExamRegistrationWindows(input: BatchDeleteExamRegistrationInput!): Boolean!
+
+  """
+  (Admin) 创建场次
+  """
+  createExamSession(input: ExamSessionInput!): ExamSession!
+
+  """
+  (Admin) 更新场次
+  """
+  updateExamSession(id: ID!, input: ExamSessionInput!): ExamSession!
+
+  """
+  (Admin) 创建排考关联
+  """
+  createExamSchedule(input: ExamScheduleInput!): ExamSchedule!
+
+  """
+  (Admin) 更新排考关联
+  """
+  updateExamSchedule(id: ID!, input: ExamScheduleInput!): ExamSchedule!
+
+  """
+  (Admin) 更新排考状态
+  """
+  updateExamScheduleStatus(input: UpdateExamScheduleStatusInput!): ExamSchedule!
+
+  """
+  (Admin) 删除排考关联
+  """
+  deleteExamSchedule(id: ID!): Boolean!
+
+  """
+  (Admin) 创建通知
+  """
+  createNotification(input: NotificationInput!): Notification!
+
+  """
+  (Admin) 更新通知
+  """
+  updateNotification(id: ID!, input: NotificationInput!): Notification!
+
+  """
+  (Admin) 发布通知
+  """
+  publishNotification(input: PublishNotificationInput!): Notification!
+
+  """
+  (Admin) 撤回通知
+  """
+  withdrawNotification(input: PublishNotificationInput!): Notification!
+
+  """
+  (Admin) 创建通知模板
+  """
+  createNotificationTemplate(input: NotificationTemplateInput!): NotificationTemplate!
+
+  """
+  (Admin) 更新通知模板
+  """
+  updateNotificationTemplate(id: ID!, input: NotificationTemplateInput!): NotificationTemplate!
+
+  """
+  (User) 提交/更新报名信息
+  """
+  upsertRegistrationInfo(input: RegistrationInfoInput!): RegistrationInfo!
+
+  """
+  (User) 上传/更新报名材料
+  """
+  uploadRegistrationMaterial(input: RegistrationMaterialInput!): RegistrationMaterial!
+
+  """
+  (User) 删除报名材料
+  """
+  deleteRegistrationMaterial(id: ID!): Boolean!
+
+  """
+  (Admin) 管理报名材料模板
+  """
+  upsertRegistrationMaterialTemplate(input: RegistrationMaterialTemplateInput!): RegistrationMaterialTemplate!
+
+  """
+  (Admin) 删除报名材料模板
+  """
+  deleteRegistrationMaterialTemplate(id: ID!): Boolean!
+
+  """
+  (Admin) 审核通过报名
+  """
+  approveRegistration(registrationInfoId: ID!): RegistrationInfo!
+
+  """
+  (Admin) 审核驳回报名
+  """
+  rejectRegistration(input: RegistrationRejectInput!): RegistrationInfo!
+
+  """
+  (Admin) 执行座位分配（随机均匀）
+  """
+  assignSeats(input: SeatAssignmentInput!): [SeatAssignment!]!
+
+  """
+  (Admin) 重置座位分配
+  """
+  resetSeats(subjectId: ID!, sessionId: ID!): Boolean!
+
+  """
+  (User) 生成/刷新准考证
+  """
+  refreshAdmitCard(registrationInfoId: ID!, templateId: ID): AdmitCard!
+
+  """
+  (Admin) 管理准考证模板
+  """
+  upsertAdmitCardTemplate(input: AdmitCardTemplateInput!): AdmitCardTemplate!
+
+  """
+  (Admin) 删除准考证模板
+  """
+  deleteAdmitCardTemplate(id: ID!): Boolean!
+
+  """
+  (Admin) 录入或更新考生成绩
+  """
+  upsertExamResult(input: UpsertExamResultInput!): ExamResult!
+
+  """
+  (Admin) 创建成绩查询预告
+  """
+  createResultPreNotification(input: ExamResultPreNotificationInput!): ExamResultPreNotification!
+
+  """
+  (Admin) 更新成绩查询预告
+  """
+  updateResultPreNotification(id: ID!, input: ExamResultPreNotificationInput!): ExamResultPreNotification!
+
+  """
+  (Admin) 发布成绩查询预告
+  """
+  publishResultPreNotification(id: ID!): ExamResultPreNotification!
+
+  """
+  (Admin) 设置/更新成绩发布时间
+  """
+  upsertResultReleaseSetting(id: ID, input: ExamResultReleaseSettingInput!): ExamResultReleaseSetting!
+
+  """
+  (Admin) 批量设置成绩发布时间
+  """
+  batchSetResultRelease(input: ExamResultReleaseBatchInput!): [ExamResultReleaseSetting!]!
+
+  """
+  (Admin) 批量导入考试成绩
+  """
+  importExamResults(input: ExamResultImportInput!): ExamResultImportJob!
+
+  """
+  (Admin) 分配监考老师
+  """
+  assignInvigilators(input: AssignInvigilatorsInput!): [InvigilatorAssignment!]!
+
+  """
+  (Admin) 取消监考分配
+  """
+  removeInvigilatorAssignment(id: ID!): Boolean!
+}

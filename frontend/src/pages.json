@@ -1,0 +1,99 @@
+{
+  "pages": [
+    {
+      "id": "home",
+      "name": "首页",
+      "path": "/",
+      "component": "Dashboard",
+      "meta": { "icon": "home" }
+    },
+    {
+      "id": "users",
+      "name": "用户管理",
+      "path": "/users",
+      "component": "UserManagement",
+      "meta": { "roles": ["ADMIN"], "icon": "user" }
+    },
+    {
+      "id": "scheduling",
+      "name": "考试安排管理",
+      "path": "/scheduling",
+      "component": "SchedulingManagement",
+      "meta": { "roles": ["ADMIN", "TEACHER"], "icon": "calendar" }
+    },
+    {
+      "id": "my-exam",
+      "name": "我的考试",
+      "path": "/my-exam",
+      "component": "MyExam",
+      "meta": { "roles": ["STUDENT"], "icon": "exam" }
+    },
+    {
+      "id": "finance-admin",
+      "name": "财务缴费管理",
+      "path": "/finance",
+      "component": "FinanceAdmin",
+      "meta": { 
+        "roles": ["ADMIN", "FINANCE"], 
+        "icon": "money" 
+      }
+    },
+    {
+      "id": "student-payment",
+      "name": "考试缴费",
+      "path": "/my-payment",
+      "component": "StudentPayment",
+      "meta": { 
+        "roles": ["STUDENT"], 
+        "icon": "wallet" 
+      }
+    },
+    {
+      "id": "exam-registration",
+      "name": "考试报名",
+      "path": "/exam-registration",
+      "component": "ExamRegistration",
+      "meta": { "roles": ["STUDENT"], "icon": "application" }
+    },
+    {
+      "id": "student-notification",
+      "name": "通知公告",
+      "path": "/student/notification",
+      "component": "StudentNotification",
+      "meta": { 
+        "roles": ["STUDENT"], 
+        "icon": "bell" 
+      }
+    },
+    {
+      "id": "teacher-notification",
+      "name": "监考任务与通知",
+      "path": "/teacher/notification",
+      "component": "TeacherNotification",
+      "meta": {
+        "roles": ["TEACHER"],
+        "icon": "bell"
+      }
+    },
+    {
+      "id": "exam-query",
+      "name": "考试信息查询",
+      "path": "/exam-query",
+      "component": "ExamQuery",
+      "meta": {
+        "roles": ["ADMIN", "TEACHER"],
+        "icon": "search"
+      }
+    },
+    {
+      "id": "grade-management",
+      "name": "成绩录入与管理",
+      "path": "/grade",
+      "component": "GradeManagement",
+      "meta": { 
+        "roles": ["ADMIN", "TEACHER"], 
+        "icon": "medal" 
+      }
+    }
+  ]
+}

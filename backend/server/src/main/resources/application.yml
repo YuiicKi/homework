@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ruangong}
+    username: ${SPRING_DATASOURCE_USERNAME:eth4n}
+    password: ${SPRING_DATASOURCE_PASSWORD:w040923a}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+  graphql:
+    graphiql:
+      enabled: true
+    cors:
+      allowed-origins: "*"
+      allowed-methods: POST,OPTIONS
+      allowed-headers: "*"
+
+jwt:
+  secret: ${JWT_SECRET:?JWT secret must be provided}
+  expires-in-seconds: ${JWT_EXPIRES_IN_SECONDS:604800}

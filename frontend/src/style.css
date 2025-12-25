@@ -1,0 +1,18 @@
+/* CSS Reset: 
+  移除 body 的默认 margin 和 padding，
+  这是导致滚动条 ("轴") 出现的元凶
+*/
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* 禁止 body 滚动 */
+}
+
+/* 让 #app 占满
+*/
+#app {
+  height: 100%;
+  width: 100%;
+}
